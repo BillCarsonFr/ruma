@@ -5,20 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedTransactionId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedTransactionId,
     };
     #[cfg(feature = "unstable-msc4354")]
     use ruma_events::StickyDurationMs;
     use ruma_events::{AnyMessageLikeEventContent, MessageLikeEventContent, MessageLikeEventType};
     use serde_json::value::to_raw_value as to_raw_json_value;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/send/{event_type}/{txn_id}",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/send/{event_type}/{txn_id}",
         }
-    };
+    }
 
     /// Request type for the `create_message_event` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to send the event to.
         #[ruma_api(path)]
@@ -47,12 +47,13 @@ pub mod v3 {
         ///
         /// It will be used by the server to ensure idempotency of requests.
         ///
-        /// [access token is refreshed]: https://spec.matrix.org/latest/client-server-api/#refreshing-access-tokens
+        /// [access token is refreshed]: https://spec.matrix.org/v1.18/client-server-api/#refreshing-access-tokens
         #[ruma_api(path)]
         pub txn_id: OwnedTransactionId,
 
         /// The event content to send.
         #[ruma_api(body)]
+        #[serde(deserialize_with = "ruma_common::serde::deserialize_raw_object")]
         pub body: Raw<AnyMessageLikeEventContent>,
 
         /// Timestamp to use for the `origin_server_ts` of the event.
@@ -61,7 +62,7 @@ pub mod v3 {
         ///
         /// Note that this does not change the position of the event in the timeline.
         ///
-        /// [timestamp massaging]: https://spec.matrix.org/latest/application-service-api/#timestamp-massaging
+        /// [timestamp massaging]: https://spec.matrix.org/v1.18/application-service-api/#timestamp-massaging
         #[ruma_api(query)]
         #[serde(skip_serializing_if = "Option::is_none", rename = "ts")]
         pub timestamp: Option<MilliSecondsSinceUnixEpoch>,
@@ -86,7 +87,7 @@ pub mod v3 {
     }
 
     /// Response type for the `create_message_event` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A unique identifier for the event.
         pub event_id: OwnedEventId,

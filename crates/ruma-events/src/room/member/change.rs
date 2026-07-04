@@ -88,11 +88,7 @@ pub struct Change<T> {
 
 impl<T: PartialEq> Change<T> {
     fn new(old: T, new: T) -> Option<Self> {
-        if old == new {
-            None
-        } else {
-            Some(Self { old, new })
-        }
+        if old == new { None } else { Some(Self { old, new }) }
     }
 }
 
@@ -101,7 +97,7 @@ impl<T: PartialEq> Change<T> {
 ///
 /// This must match the table for [`m.room.member`] in the spec.
 ///
-/// [`m.room.member`]: https://spec.matrix.org/latest/client-server-api/#mroommember
+/// [`m.room.member`]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
 pub(super) fn membership_change<'a>(
     details: MembershipDetails<'a>,
     prev_details: Option<MembershipDetails<'a>>,

@@ -1,10 +1,10 @@
 //! Types for the [`m.room.create`] event.
 //!
-//! [`m.room.create`]: https://spec.matrix.org/latest/client-server-api/#mroomcreate
+//! [`m.room.create`]: https://spec.matrix.org/v1.18/client-server-api/#mroomcreate
 
 use ruma_common::{
-    room::RoomType, room_version_rules::RedactionRules, OwnedEventId, OwnedRoomId, OwnedUserId,
-    RoomVersionId,
+    OwnedEventId, OwnedRoomId, OwnedUserId, RoomVersionId, room::RoomType,
+    room_version_rules::RedactionRules,
 };
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
@@ -56,8 +56,6 @@ pub struct RoomCreateEventContent {
     pub predecessor: Option<PreviousRoom>,
 
     /// The room type.
-    ///
-    /// This is currently only used for spaces.
     #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
     pub room_type: Option<RoomType>,
 
@@ -165,8 +163,8 @@ impl RedactedStateEventContent for RedactedRoomCreateEventContent {
 #[cfg(test)]
 mod tests {
     use assert_matches2::assert_matches;
-    use ruma_common::{owned_user_id, RoomVersionId};
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{RoomVersionId, canonical_json::assert_to_canonical_json_eq, owned_user_id};
+    use serde_json::{from_value as from_json_value, json};
 
     use super::{RoomCreateEventContent, RoomType};
 
@@ -182,13 +180,14 @@ mod tests {
             additional_creators: Vec::new(),
         };
 
-        let json = json!({
-            "creator": "@carl:example.com",
-            "m.federate": false,
-            "room_version": "4"
-        });
-
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "creator": "@carl:example.com",
+                "m.federate": false,
+                "room_version": "4",
+            }),
+        );
     }
 
     #[test]
@@ -203,14 +202,39 @@ mod tests {
             additional_creators: Vec::new(),
         };
 
-        let json = json!({
-            "creator": "@carl:example.com",
-            "m.federate": false,
-            "room_version": "4",
-            "type": "m.space"
-        });
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "creator": "@carl:example.com",
+                "m.federate": false,
+                "room_version": "4",
+                "type": "m.space",
+            }),
+        );
+    }
 
-        assert_eq!(to_json_value(&content).unwrap(), json);
+    #[test]
+    #[cfg(feature = "unstable-msc3417")]
+    fn call_serialization() {
+        #[allow(deprecated)]
+        let content = RoomCreateEventContent {
+            creator: Some(owned_user_id!("@carl:example.com")),
+            federate: false,
+            room_version: RoomVersionId::V4,
+            predecessor: None,
+            room_type: Some(RoomType::Call),
+            additional_creators: Vec::new(),
+        };
+
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "creator": "@carl:example.com",
+                "m.federate": false,
+                "room_version": "4",
+                "type": "org.matrix.msc3417.call",
+            }),
+        );
     }
 
     #[test]
@@ -246,6 +270,25 @@ mod tests {
         assert_eq!(content.room_version, RoomVersionId::V4);
         assert_matches!(content.predecessor, None);
         assert_eq!(content.room_type, Some(RoomType::Space));
+    }
+
+    #[test]
+    #[cfg(feature = "unstable-msc3417")]
+    #[allow(deprecated)]
+    fn call_deserialization() {
+        let json = json!({
+            "creator": "@carl:example.com",
+            "m.federate": true,
+            "room_version": "4",
+            "type": "org.matrix.msc3417.call"
+        });
+
+        let content = from_json_value::<RoomCreateEventContent>(json).unwrap();
+        assert_eq!(content.creator.unwrap(), "@carl:example.com");
+        assert!(content.federate);
+        assert_eq!(content.room_version, RoomVersionId::V4);
+        assert_matches!(content.predecessor, None);
+        assert_eq!(content.room_type, Some(RoomType::Call));
     }
 
     #[test]

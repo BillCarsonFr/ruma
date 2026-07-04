@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use js_int::UInt;
 use ruma_common::MilliSecondsSinceUnixEpoch;
-use ruma_events::{relation::Reference, Mentions};
+use ruma_events::{Mentions, relation::Reference};
 use ruma_macros::{EventContent, StringEnum};
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +43,13 @@ pub struct RtcNotificationEventContent {
 
     /// How this notification should notify the receiver.
     pub notification_type: NotificationType,
+
+    /// Gives a soft indication of whether the call is a "audio" or "video" (+audio) call.
+    ///
+    /// This is just to indicate between trusted callers that they can start with audio or video
+    /// off, but the actual call semantics remain the same, and they may switch at will.
+    #[serde(rename = "m.call.intent", skip_serializing_if = "Option::is_none")]
+    pub call_intent: Option<CallIntent>,
 }
 
 impl RtcNotificationEventContent {
@@ -52,7 +59,14 @@ impl RtcNotificationEventContent {
         lifetime: Duration,
         notification_type: NotificationType,
     ) -> Self {
-        Self { sender_ts, lifetime, mentions: None, relates_to: None, notification_type }
+        Self {
+            sender_ts,
+            lifetime,
+            mentions: None,
+            relates_to: None,
+            notification_type,
+            call_intent: None,
+        }
     }
 
     /// Calculates the timestamp at which this notification is considered invalid.
@@ -97,7 +111,7 @@ impl RtcNotificationEventContent {
 
 /// How this notification should notify the receiver.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[ruma_enum(rename_all = "snake_case")]
 pub enum NotificationType {
@@ -111,16 +125,35 @@ pub enum NotificationType {
     _Custom(PrivOwnedStr),
 }
 
+/// Indication of whether the call is a "audio" or "video"(+audio) call.
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
+#[derive(Clone, StringEnum)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+#[ruma_enum(rename_all = "snake_case")]
+pub enum CallIntent {
+    /// Soft indication from the sender that the call is intended for audio.
+    Audio,
+
+    /// Soft indication from the sender that the call is intended for video.
+    /// Hence that the receiver should start with camera enabled.
+    Video,
+
+    #[doc(hidden)]
+    _Custom(PrivOwnedStr),
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
     use assert_matches2::assert_matches;
     use js_int::UInt;
-    use ruma_common::{owned_event_id, MilliSecondsSinceUnixEpoch};
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{
+        MilliSecondsSinceUnixEpoch, canonical_json::assert_to_canonical_json_eq, owned_event_id,
+    };
+    use serde_json::{from_value as from_json_value, json};
 
-    use super::{NotificationType, RtcNotificationEventContent};
+    use super::{CallIntent, NotificationType, RtcNotificationEventContent};
     use crate::{AnyMessageLikeEvent, Mentions, MessageLikeEvent};
 
     #[test]
@@ -133,16 +166,61 @@ mod tests {
         content.mentions = Some(Mentions::with_room_mention());
         content.relates_to = Some(ruma_events::relation::Reference::new(owned_event_id!("$m:ex")));
 
-        assert_eq!(
-            to_json_value(&content).unwrap(),
+        assert_to_canonical_json_eq!(
+            content,
             json!({
                 "sender_ts": 1_752_583_130_365_u64,
                 "lifetime": 30_000_u32,
                 "m.mentions": {"room": true},
                 "m.relates_to": {"rel_type": "m.reference", "event_id": "$m:ex"},
-                "notification_type": "ring"
+                "notification_type": "ring",
             })
         );
+    }
+
+    #[test]
+    fn notification_event_call_intent_serialization() {
+        let mut content = RtcNotificationEventContent::new(
+            MilliSecondsSinceUnixEpoch(UInt::new(0).unwrap()),
+            Duration::from_millis(30_000),
+            NotificationType::Notification,
+        );
+        content.call_intent = Some(CallIntent::Audio);
+
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "sender_ts": 0,
+                "lifetime": 30_000_u32,
+                "notification_type": "notification",
+                "m.call.intent": "audio",
+            })
+        );
+    }
+
+    #[test]
+    fn call_intent_deserialization_default() {
+        let raw_content = json!({
+            "m.mentions": {
+                "user_ids": [],
+                "room": true
+            },
+            "notification_type": "ring",
+            "m.relates_to": {
+                "event_id": "$IACrEkEKgDa-n4cMk-lEJ3vqLLUL9zX1nVyAnpmFaec",
+                "rel_type": "m.reference"
+            },
+            "sender_ts": 17_709_890_710_u64,
+            "lifetime": 30000,
+        });
+        let content: RtcNotificationEventContent = from_json_value(raw_content).unwrap();
+        assert_eq!(content.call_intent, None);
+    }
+
+    #[test]
+    fn test_call_intent_serialization() {
+        assert_eq!(serde_json::to_string(&CallIntent::Audio).unwrap(), r#""audio""#);
+        assert_eq!(serde_json::to_string(&CallIntent::Video).unwrap(), r#""video""#);
     }
 
     #[test]

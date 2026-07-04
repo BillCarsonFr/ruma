@@ -1,8 +1,8 @@
-use crate::{validate_id, Error};
+use crate::{Error, validate_id};
 
 /// Validate a [room ID] as used by clients.
 ///
-/// [room ID]: https://spec.matrix.org/latest/appendices/#room-ids
+/// [room ID]: https://spec.matrix.org/v1.18/appendices/#room-ids
 pub fn validate(s: &str) -> Result<(), Error> {
     validate_id(s, b'!')?;
 

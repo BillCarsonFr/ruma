@@ -5,15 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3pushrulesglobal
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3pushrulesglobal
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         push::Ruleset,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -21,15 +21,15 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/pushrules/global/",
             1.1 => "/_matrix/client/v3/pushrules/global/",
         }
-    };
+    }
 
     /// Request type for the `get_pushrules_global_scope` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {}
 
     /// Response type for the `get_pushrules_global_scope` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The global ruleset.
         #[ruma_api(body)]

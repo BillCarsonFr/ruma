@@ -5,18 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomidstateeventtypestatekey
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3roomsroomidstateeventtypestatekey
 
     use ruma_common::{
-        api::{response, Metadata},
-        metadata,
-        serde::Raw,
         OwnedRoomId,
+        api::{auth_scheme::AccessToken, error::Error, response},
+        metadata,
+        serde::{Raw, StringEnum},
     };
     use ruma_events::{AnyStateEvent, AnyStateEventContent, StateEventType};
     use serde_json::value::RawValue as RawJsonValue;
 
-    const METADATA: Metadata = metadata! {
+    use crate::PrivOwnedStr;
+
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -24,7 +26,7 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/state/{event_type}/{state_key}",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/state/{event_type}/{state_key}",
         }
-    };
+    }
 
     /// Request type for the `get_state_events_for_key` endpoint.
     #[derive(Clone, Debug)]
@@ -51,11 +53,10 @@ pub mod v3 {
     }
 
     /// The format to use for the returned data.
-    #[cfg_attr(feature = "client", derive(serde::Serialize))]
-    #[cfg_attr(feature = "server", derive(serde::Deserialize))]
+    #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
+    #[derive(Default, Clone, StringEnum)]
+    #[ruma_enum(rename_all = "lowercase")]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
-    #[derive(Default, Debug, PartialEq, Clone, Copy)]
-    #[serde(rename_all = "lowercase")]
     pub enum StateEventFormat {
         /// Will return only the content of the state event.
         ///
@@ -66,6 +67,9 @@ pub mod v3 {
         /// Will return the entire event in the usual format suitable for clients, including fields
         /// like event ID, sender and timestamp.
         Event,
+
+        #[doc(hidden)]
+        _Custom(PrivOwnedStr),
     }
 
     /// Response type for the `get_state_events_for_key` endpoint, either the `Raw` `AnyStateEvent`
@@ -73,7 +77,7 @@ pub mod v3 {
     ///
     /// While it's possible to access the raw value directly, it's recommended you use the
     /// provided helper methods to access it, and `From` to create it.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The full event (content) of the state event.
         #[ruma_api(body)]
@@ -121,50 +125,41 @@ pub mod v3 {
 
     #[cfg(feature = "client")]
     impl ruma_common::api::OutgoingRequest for Request {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
         type IncomingResponse = Response;
 
-        const METADATA: Metadata = METADATA;
-
-        fn try_into_http_request<T: Default + bytes::BufMut>(
+        fn try_into_http_request<T: Default + bytes::BufMut + AsRef<[u8]>>(
             self,
             base_url: &str,
-            access_token: ruma_common::api::SendAccessToken<'_>,
-            considering: &'_ ruma_common::api::SupportedVersions,
+            access_token: ruma_common::api::auth_scheme::SendAccessToken<'_>,
+            considering: std::borrow::Cow<'_, ruma_common::api::SupportedVersions>,
         ) -> Result<http::Request<T>, ruma_common::api::error::IntoHttpError> {
-            use http::header;
+            use ruma_common::api::{Metadata, auth_scheme::AuthScheme};
 
             let query_string = serde_html_form::to_string(RequestQuery { format: self.format })?;
 
-            http::Request::builder()
-                .method(http::Method::GET)
-                .uri(METADATA.make_endpoint_url(
+            let mut http_request = http::Request::builder()
+                .method(Self::METHOD)
+                .uri(Self::make_endpoint_url(
                     considering,
                     base_url,
                     &[&self.room_id, &self.event_type, &self.state_key],
                     &query_string,
                 )?)
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(
-                    header::AUTHORIZATION,
-                    format!(
-                        "Bearer {}",
-                        access_token
-                            .get_required_for_endpoint()
-                            .ok_or(ruma_common::api::error::IntoHttpError::NeedsAuthentication)?,
-                    ),
-                )
-                .body(T::default())
-                .map_err(Into::into)
+                .body(T::default())?;
+
+            Self::Authentication::add_authentication(&mut http_request, access_token).map_err(
+                |error| ruma_common::api::error::IntoHttpError::Authentication(error.into()),
+            )?;
+
+            Ok(http_request)
         }
     }
 
     #[cfg(feature = "server")]
     impl ruma_common::api::IncomingRequest for Request {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
         type OutgoingResponse = Response;
-
-        const METADATA: Metadata = METADATA;
 
         fn try_from_http_request<B, S>(
             request: http::Request<B>,
@@ -174,6 +169,8 @@ pub mod v3 {
             B: AsRef<[u8]>,
             S: AsRef<str>,
         {
+            Self::check_request_method(request.method())?;
+
             // FIXME: find a way to make this if-else collapse with serde recognizing trailing
             // Option
             let (room_id, event_type, state_key): (OwnedRoomId, StateEventType, String) =

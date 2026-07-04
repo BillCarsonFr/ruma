@@ -1,9 +1,9 @@
 //! Types for the [`m.room_key_request`] event.
 //!
-//! [`m.room_key_request`]: https://spec.matrix.org/latest/client-server-api/#mroom_key_request
+//! [`m.room_key_request`]: https://spec.matrix.org/v1.18/client-server-api/#mroom_key_request
 
 use ruma_common::{
-    serde::StringEnum, EventEncryptionAlgorithm, OwnedDeviceId, OwnedRoomId, OwnedTransactionId,
+    EventEncryptionAlgorithm, OwnedDeviceId, OwnedRoomId, OwnedTransactionId, serde::StringEnum,
 };
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ impl ToDeviceRoomKeyRequestEventContent {
 
 /// A new key request or a cancellation of a previous request.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Action {

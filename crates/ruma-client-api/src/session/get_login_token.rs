@@ -5,18 +5,18 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv1loginget_token
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv1loginget_token
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
     };
 
     use crate::uiaa::{AuthData, UiaaResponse};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -24,7 +24,7 @@ pub mod v1 {
             unstable("org.matrix.msc3882") => "/_matrix/client/unstable/org.matrix.msc3882/login/get_token",
             1.7 => "/_matrix/client/v1/login/get_token",
         }
-    };
+    }
 
     /// Request type for the `login` endpoint.
     #[request(error = UiaaResponse)]

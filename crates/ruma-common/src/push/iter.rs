@@ -1,10 +1,10 @@
 use indexmap::set::{IntoIter as IndexSetIntoIter, Iter as IndexSetIter};
 
 use super::{
-    condition, Action, ConditionalPushRule, FlattenedJson, PatternedPushRule, PushConditionRoomCtx,
-    Ruleset, SimplePushRule,
+    Action, ConditionalPushRule, FlattenedJson, PatternedPushRule, PushConditionRoomCtx, Ruleset,
+    SimplePushRule, condition,
 };
-use crate::{OwnedRoomId, OwnedUserId};
+use crate::{OwnedRoomId, OwnedUserId, push::action::SoundTweakValue};
 
 /// The kinds of push rules that are available.
 #[derive(Clone, Debug)]
@@ -72,7 +72,7 @@ impl AnyPushRule {
     }
 
     /// The sound that should be played when an event matches the push rule, if any.
-    pub fn triggers_sound(&self) -> Option<&str> {
+    pub fn triggers_sound(&self) -> Option<&SoundTweakValue> {
         self.as_ref().triggers_sound()
     }
 
@@ -227,7 +227,7 @@ impl<'a> AnyPushRuleRef<'a> {
     }
 
     /// The sound that should be played when an event matches the push rule, if any.
-    pub fn triggers_sound(self) -> Option<&'a str> {
+    pub fn triggers_sound(self) -> Option<&'a SoundTweakValue> {
         self.actions().iter().find_map(|a| a.sound())
     }
 

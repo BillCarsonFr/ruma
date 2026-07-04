@@ -2,11 +2,11 @@
 //!
 //! See the [Matrix specification][spec] for more details about spaces.
 //!
-//! [spec]: https://spec.matrix.org/latest/client-server-api/#spaces
+//! [spec]: https://spec.matrix.org/v1.18/client-server-api/#spaces
 
 use ruma_common::{
     room::RoomSummary,
-    serde::{from_raw_json_value, Raw},
+    serde::{Raw, from_raw_json_value},
 };
 use ruma_events::space::child::HierarchySpaceChildEvent;
 use serde::{Deserialize, Serialize};

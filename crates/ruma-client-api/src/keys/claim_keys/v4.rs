@@ -5,25 +5,25 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use ruma_common::{
-    api::{request, response, Metadata},
+    OneTimeKeyAlgorithm, OwnedDeviceId, OwnedOneTimeKeyId, OwnedUserId,
+    api::{auth_scheme::AccessToken, request, response},
     encryption::OneTimeKey,
     metadata,
     serde::Raw,
-    OneTimeKeyAlgorithm, OwnedDeviceId, OwnedOneTimeKeyId, OwnedUserId,
 };
 use serde_json::Value as JsonValue;
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: POST,
     rate_limited: false,
     authentication: AccessToken,
     history: {
         unstable => "/_matrix/client/unstable/org.matrix.msc3983/keys/claim",
     }
-};
+}
 
 /// Request type for the `claim_keys` endpoint.
-#[request(error = crate::Error)]
+#[request]
 pub struct Request {
     /// The time (in milliseconds) to wait when downloading keys from remote servers.
     /// 10 seconds is the recommended default.
@@ -39,7 +39,7 @@ pub struct Request {
 }
 
 /// Response type for the `claim_keys` endpoint.
-#[response(error = crate::Error)]
+#[response]
 pub struct Response {
     /// If any remote homeservers could not be reached, they are recorded here.
     ///

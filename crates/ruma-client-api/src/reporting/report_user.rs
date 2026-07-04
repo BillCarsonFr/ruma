@@ -5,14 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3usersuseridreport
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3usersuseridreport
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedUserId,
+        OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -20,10 +21,10 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/org.matrix.msc4260/users/{user_id}/report",
             1.14 => "/_matrix/client/v3/users/{user_id}/report",
         }
-    };
+    }
 
     /// Request type for the `report_user` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The ID of the user to report.
         #[ruma_api(path)]
@@ -34,7 +35,7 @@ pub mod v3 {
     }
 
     /// Response type for the `report_user` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

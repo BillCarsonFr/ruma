@@ -8,11 +8,15 @@ pub mod v3 {
     //! [spec]: https://spec.matrix.org/v1.15/client-server-api/#put_matrixclientv3profileuseridavatar_url
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedMxcUri, OwnedUserId,
+        OwnedMxcUri, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    #[cfg(feature = "unstable-msc4466")]
+    use crate::profile::PropagateTo;
+
+    metadata! {
         method: PUT,
         rate_limited: true,
         authentication: AccessToken,
@@ -20,10 +24,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/profile/{user_id}/avatar_url",
             1.1 => "/_matrix/client/v3/profile/{user_id}/avatar_url",
         }
-    };
+    }
 
     /// Request type for the `set_avatar_url` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The user whose avatar URL will be set.
         #[ruma_api(path)]
@@ -60,21 +64,31 @@ pub mod v3 {
         #[cfg(feature = "unstable-msc2448")]
         #[serde(rename = "xyz.amorgan.blurhash", skip_serializing_if = "Option::is_none")]
         pub blurhash: Option<String>,
+
+        /// The propagation mode to use for this profile update.
+        #[cfg(feature = "unstable-msc4466")]
+        #[ruma_api(query)]
+        #[serde(rename = "computer.gingershaped.msc4466.propagate_to")]
+        #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
+        pub propagate_to: PropagateTo,
     }
 
     /// Response type for the `set_avatar_url` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 
     impl Request {
         /// Creates a new `Request` with the given user ID and avatar URL.
+        #[deprecated = "Use the set_profile_field endpoint instead."]
         pub fn new(user_id: OwnedUserId, avatar_url: Option<OwnedMxcUri>) -> Self {
             Self {
                 user_id,
                 avatar_url,
                 #[cfg(feature = "unstable-msc2448")]
                 blurhash: None,
+                #[cfg(feature = "unstable-msc4466")]
+                propagate_to: PropagateTo::default(),
             }
         }
     }

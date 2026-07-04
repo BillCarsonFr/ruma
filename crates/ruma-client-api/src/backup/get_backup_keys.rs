@@ -5,18 +5,19 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3room_keyskeys
 
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId,
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::backup::RoomKeyBackup;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -25,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/room_keys/keys",
             1.1 => "/_matrix/client/v3/room_keys/keys",
         }
-    };
+    }
 
     /// Request type for the `get_backup_keys` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The backup version to retrieve keys from.
         #[ruma_api(query)]
@@ -36,7 +37,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_backup_keys` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A map from room IDs to session IDs to key data.
         pub rooms: BTreeMap<OwnedRoomId, RoomKeyBackup>,

@@ -5,17 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3account3piddelete
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3account3piddelete
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         thirdparty::Medium,
     };
 
     use crate::account::ThirdPartyIdRemovalStatus;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
@@ -23,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/account/3pid/delete",
             1.1 => "/_matrix/client/v3/account/3pid/delete",
         }
-    };
+    }
 
     /// Request type for the `delete_3pid` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// Identity server to delete from.
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -40,7 +40,7 @@ pub mod v3 {
     }
 
     /// Response type for the `delete_3pid` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// Result of unbind operation.
         pub id_server_unbind_result: ThirdPartyIdRemovalStatus,
@@ -50,6 +50,13 @@ pub mod v3 {
         /// Creates a new `Request` with the given medium and address.
         pub fn new(medium: Medium, address: String) -> Self {
             Self { id_server: None, medium, address }
+        }
+    }
+
+    impl Response {
+        /// Creates a new `Response` with the given unbind result.
+        pub fn new(id_server_unbind_result: ThirdPartyIdRemovalStatus) -> Self {
+            Self { id_server_unbind_result }
         }
     }
 }

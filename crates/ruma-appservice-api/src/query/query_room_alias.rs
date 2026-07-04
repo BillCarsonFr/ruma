@@ -5,21 +5,20 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/application-service-api/#get_matrixappv1roomsroomalias
+    //! [spec]: https://spec.matrix.org/v1.18/application-service-api/#get_matrixappv1roomsroomalias
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomAliasId,
+        OwnedRoomAliasId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
-        history: {
-            1.0 => "/_matrix/app/v1/rooms/{room_alias}",
-        }
-    };
+        path: "/_matrix/app/v1/rooms/{room_alias}",
+    }
 
     /// Request type for the `query_room_alias` endpoint.
     #[request]

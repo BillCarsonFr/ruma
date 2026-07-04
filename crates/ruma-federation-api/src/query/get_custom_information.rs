@@ -6,24 +6,24 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#get_matrixfederationv1queryquerytype
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#get_matrixfederationv1queryquerytype
 
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{request, response},
         metadata,
     };
     use serde_json::Value as JsonValue;
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: AccessToken,
-        history: {
-            1.0 => "/_matrix/federation/v1/query/{query_type}",
-        }
-    };
+        authentication: ServerSignatures,
+        path: "/_matrix/federation/v1/query/{query_type}",
+    }
 
     /// Request type for the `get_custom_information` endpoint.
     #[request]

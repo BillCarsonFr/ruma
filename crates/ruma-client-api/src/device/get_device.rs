@@ -5,16 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3devicesdeviceid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3devicesdeviceid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedDeviceId,
+        OwnedDeviceId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::device::Device;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -22,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/devices/{device_id}",
             1.1 => "/_matrix/client/v3/devices/{device_id}",
         }
-    };
+    }
 
     /// Request type for the `get_device` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The device to retrieve.
         #[ruma_api(path)]
@@ -33,7 +34,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_device` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// Information about the device.
         #[ruma_api(body)]

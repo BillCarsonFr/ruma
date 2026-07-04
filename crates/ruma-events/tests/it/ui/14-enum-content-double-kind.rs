@@ -1,5 +1,8 @@
 #![allow(unexpected_cfgs)]
 
+#[cfg(feature = "unstable-uniffi")]
+uniffi::setup_scaffolding!();
+
 use ruma_macros::event_enum;
 
 mod event {
@@ -39,16 +42,12 @@ fn main() {
     );
 
     // Both event type aliases are created, and they work with the enum variants.
-    let _ = AnyGlobalAccountDataEvent::MacroTest(event::GlobalMacroTestEvent {
-        content: content.clone(),
-    });
-    let _ = AnyRoomAccountDataEvent::MacroTest(event::RoomMacroTestEvent { content });
+    let _ = AnyGlobalAccountDataEvent::MacroTest(event::GlobalMacroTestEvent::new(content.clone()));
+    let _ = AnyRoomAccountDataEvent::MacroTest(event::RoomMacroTestEvent::new(content));
 
     // Both event type enums variants are created.
     assert_eq!(GlobalAccountDataEventType::MacroTest.to_string(), "m.macro.test");
     assert_eq!(RoomAccountDataEventType::MacroTest.to_string(), "m.macro.test");
 }
 
-#[doc(hidden)]
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PrivOwnedStr(Box<str>);
+ruma_common::priv_owned_str!(uniffi);

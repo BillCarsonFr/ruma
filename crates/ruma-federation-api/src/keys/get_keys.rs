@@ -5,26 +5,26 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#post_matrixfederationv1userkeysquery
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#post_matrixfederationv1userkeysquery
 
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedDeviceId, OwnedUserId,
+        api::{request, response},
         encryption::{CrossSigningKey, DeviceKeys},
         metadata,
         serde::Raw,
-        OwnedDeviceId, OwnedUserId,
     };
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/user/keys/query",
-        }
-    };
+        path: "/_matrix/federation/v1/user/keys/query",
+    }
 
     /// Request type for the `get_keys` endpoint.
     #[request]

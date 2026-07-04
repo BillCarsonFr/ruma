@@ -5,15 +5,16 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3useruseridroomsroomidtags
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3useruseridroomsroomidtags
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId, OwnedUserId,
+        OwnedRoomId, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
     use ruma_events::tag::Tags;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -21,10 +22,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/user/{user_id}/rooms/{room_id}/tags",
             1.1 => "/_matrix/client/v3/user/{user_id}/rooms/{room_id}/tags",
         }
-    };
+    }
 
     /// Request type for the `get_tags` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The user whose tags will be retrieved.
         #[ruma_api(path)]
@@ -36,7 +37,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_tags` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The user's tags for the room.
         pub tags: Tags,

@@ -4,49 +4,101 @@
 
 use std::{error::Error as StdError, fmt, num::ParseIntError, sync::Arc};
 
+use as_variant::as_variant;
 use bytes::{BufMut, Bytes};
-use serde_json::{from_slice as from_json_slice, Value as JsonValue};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value as JsonValue, from_slice as from_json_slice};
 use thiserror::Error;
 
+mod kind;
+mod kind_serde;
+#[cfg(test)]
+mod tests;
+
+pub use self::kind::*;
 use super::{EndpointError, MatrixVersion, OutgoingResponse};
 
-/// A general-purpose Matrix error type consisting of an HTTP status code and a JSON body.
-///
-/// Note that individual `ruma-*-api` crates may provide more specific error types.
-#[allow(clippy::exhaustive_structs)]
+/// An error returned from a Matrix API endpoint.
 #[derive(Clone, Debug)]
-pub struct MatrixError {
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct Error {
     /// The http response's status code.
     pub status_code: http::StatusCode,
 
     /// The http response's body.
-    pub body: MatrixErrorBody,
+    pub body: ErrorBody,
 }
 
-impl fmt::Display for MatrixError {
+impl Error {
+    /// Constructs a new `Error` with the given status code and body.
+    ///
+    /// This is equivalent to calling `body.into_error(status_code)`.
+    pub fn new(status_code: http::StatusCode, body: ErrorBody) -> Self {
+        Self { status_code, body }
+    }
+
+    /// If this is an error with a [`StandardErrorBody`], returns the [`ErrorKind`].
+    pub fn error_kind(&self) -> Option<&ErrorKind> {
+        as_variant!(&self.body, ErrorBody::Standard(StandardErrorBody { kind, .. }) => kind)
+    }
+
+    /// Whether this error matches the expected format for an endpoint that is not implemented by
+    /// the homeserver.
+    ///
+    /// Return `true` if this contains an [`ErrorKind::Unrecognized`] with a
+    /// [`http::StatusCode::NOT_FOUND`].
+    ///
+    /// [unsupported endpoint]:
+    pub fn is_endpoint_not_implemented(&self) -> bool {
+        self.status_code == http::StatusCode::NOT_FOUND
+            && self
+                .error_kind()
+                .is_some_and(|error_kind| matches!(error_kind, ErrorKind::Unrecognized))
+    }
+}
+
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let status_code = self.status_code.as_u16();
         match &self.body {
-            MatrixErrorBody::Json(json) => write!(f, "[{status_code}] {json}"),
-            MatrixErrorBody::NotJson { .. } => write!(f, "[{status_code}] <non-json bytes>"),
+            ErrorBody::Standard(StandardErrorBody { kind, message }) => {
+                let errcode = kind.errcode();
+                write!(f, "[{status_code} / {errcode}] {message}")
+            }
+            ErrorBody::Json(json) => write!(f, "[{status_code}] {json}"),
+            ErrorBody::NotJson { .. } => write!(f, "[{status_code}] <non-json bytes>"),
         }
     }
 }
 
-impl StdError for MatrixError {}
+impl StdError for Error {}
 
-impl OutgoingResponse for MatrixError {
+impl OutgoingResponse for Error {
     fn try_into_http_response<T: Default + BufMut>(
         self,
     ) -> Result<http::Response<T>, IntoHttpError> {
-        http::Response::builder()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .status(self.status_code)
+        let mut builder = http::Response::builder()
+            .header(http::header::CONTENT_TYPE, ruma_common::http_headers::APPLICATION_JSON)
+            .status(self.status_code);
+
+        // Add data in headers.
+        if let Some(ErrorKind::LimitExceeded(LimitExceededErrorData {
+            retry_after: Some(retry_after),
+        })) = self.error_kind()
+        {
+            let header_value = http::HeaderValue::try_from(retry_after)?;
+            builder = builder.header(http::header::RETRY_AFTER, header_value);
+        }
+
+        builder
             .body(match self.body {
-                MatrixErrorBody::Json(json) => crate::serde::json_to_buf(&json)?,
-                MatrixErrorBody::NotJson { .. } => {
+                ErrorBody::Standard(standard_body) => {
+                    ruma_common::serde::json_to_buf(&standard_body)?
+                }
+                ErrorBody::Json(json) => ruma_common::serde::json_to_buf(&json)?,
+                ErrorBody::NotJson { .. } => {
                     return Err(IntoHttpError::Json(serde::ser::Error::custom(
-                        "attempted to serialize MatrixErrorBody::NotJson",
+                        "attempted to serialize ErrorBody::NotJson",
                     )));
                 }
             })
@@ -54,19 +106,50 @@ impl OutgoingResponse for MatrixError {
     }
 }
 
-impl EndpointError for MatrixError {
+impl EndpointError for Error {
     fn from_http_response<T: AsRef<[u8]>>(response: http::Response<T>) -> Self {
-        let status_code = response.status();
-        let body = MatrixErrorBody::from_bytes(response.body().as_ref());
-        Self { status_code, body }
+        let status = response.status();
+
+        let body_bytes = &response.body().as_ref();
+        let error_body: ErrorBody = match from_json_slice::<StandardErrorBody>(body_bytes) {
+            Ok(mut standard_body) => {
+                let headers = response.headers();
+
+                if let ErrorKind::LimitExceeded(LimitExceededErrorData { retry_after }) =
+                    &mut standard_body.kind
+                {
+                    // The Retry-After header takes precedence over the retry_after_ms field in
+                    // the body.
+                    if let Some(Ok(retry_after_header)) =
+                        headers.get(http::header::RETRY_AFTER).map(RetryAfter::try_from)
+                    {
+                        *retry_after = Some(retry_after_header);
+                    }
+                }
+
+                ErrorBody::Standard(standard_body)
+            }
+            Err(_) => match from_json_slice(body_bytes) {
+                Ok(json) => ErrorBody::Json(json),
+                Err(error) => ErrorBody::NotJson {
+                    bytes: Bytes::copy_from_slice(body_bytes),
+                    deserialization_error: Arc::new(error),
+                },
+            },
+        };
+
+        error_body.into_error(status)
     }
 }
 
-/// The body of an error response.
-#[derive(Clone, Debug)]
+/// The body of a Matrix API endpoint error.
+#[derive(Debug, Clone)]
 #[allow(clippy::exhaustive_enums)]
-pub enum MatrixErrorBody {
-    /// A JSON body, as intended.
+pub enum ErrorBody {
+    /// A JSON body with the fields expected for Matrix endpoints errors.
+    Standard(StandardErrorBody),
+
+    /// A JSON body with an unexpected structure.
     Json(JsonValue),
 
     /// A response body that is not valid JSON.
@@ -79,16 +162,32 @@ pub enum MatrixErrorBody {
     },
 }
 
-impl MatrixErrorBody {
-    /// Create a `MatrixErrorBody` from the given HTTP body bytes.
-    pub fn from_bytes(body_bytes: &[u8]) -> Self {
-        match from_json_slice(body_bytes) {
-            Ok(json) => MatrixErrorBody::Json(json),
-            Err(e) => MatrixErrorBody::NotJson {
-                bytes: Bytes::copy_from_slice(body_bytes),
-                deserialization_error: Arc::new(e),
-            },
-        }
+impl ErrorBody {
+    /// Convert the ErrorBody into an Error by adding the http status code.
+    ///
+    /// This is equivalent to calling `Error::new(status_code, self)`.
+    pub fn into_error(self, status_code: http::StatusCode) -> Error {
+        Error { status_code, body: self }
+    }
+}
+
+/// A JSON body with the fields expected for Matrix API endpoints errors.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct StandardErrorBody {
+    /// A value which can be used to handle an error message.
+    #[serde(flatten)]
+    pub kind: ErrorKind,
+
+    /// A human-readable error message, usually a sentence explaining what went wrong.
+    #[serde(rename = "error")]
+    pub message: String,
+}
+
+impl StandardErrorBody {
+    /// Construct a new `StandardErrorBody` with the given kind and message.
+    pub fn new(kind: ErrorKind, message: String) -> Self {
+        Self { kind, message }
     }
 }
 
@@ -97,9 +196,9 @@ impl MatrixErrorBody {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum IntoHttpError {
-    /// Tried to create an authentication request without an access token.
-    #[error("no access token given, but this endpoint requires one")]
-    NeedsAuthentication,
+    /// Failed to add the authentication scheme to the request.
+    #[error("failed to add authentication scheme: {0}")]
+    Authentication(Box<dyn std::error::Error + Send + Sync + 'static>),
 
     /// Tried to create a request with an old enough version, for which no unstable endpoint
     /// exists.
@@ -220,6 +319,19 @@ where
 }
 
 impl<E: StdError> StdError for FromHttpResponseError<E> {}
+
+/// Extension trait for `FromHttpResponseError<Error>`.
+pub trait FromHttpResponseErrorExt {
+    /// If `self` is a server error in the `errcode` + `error` format expected
+    /// for Matrix API endpoints, returns the error kind (`errcode`).
+    fn error_kind(&self) -> Option<&ErrorKind>;
+}
+
+impl FromHttpResponseErrorExt for FromHttpResponseError<Error> {
+    fn error_kind(&self) -> Option<&ErrorKind> {
+        as_variant!(self, Self::Server)?.error_kind()
+    }
+}
 
 /// An error when converting a http request / response to one of ruma's endpoint-specific request /
 /// response types.
@@ -351,8 +463,10 @@ impl fmt::Display for UnknownVersionError {
 
 impl StdError for UnknownVersionError {}
 
-/// An error that happens when an incorrect amount of arguments have been passed to PathData parts
-/// formatting.
+/// An error that happens when an incorrect amount of arguments have been passed to [`PathBuilder`]
+/// parts formatting.
+///
+/// [`PathBuilder`]: super::path_builder::PathBuilder
 #[derive(Debug)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct IncorrectArgumentCount {

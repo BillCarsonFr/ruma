@@ -1,20 +1,19 @@
-use assert_matches2::assert_matches;
-use ruma_common::owned_event_id;
+use assert_matches2::{assert_let, assert_matches};
+use ruma_common::{canonical_json::assert_to_canonical_json_eq, owned_event_id};
 use ruma_events::{
-    relation::InReplyTo,
+    relation::Reply,
     room::message::{MessageType, Relation, RoomMessageEventContent},
 };
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use serde_json::{from_value as from_json_value, json};
 
 #[test]
 fn serialize_room_message_content_without_relation() {
     let mut content = RoomMessageEventContent::text_plain("Hello, world!");
-    content.relates_to =
-        Some(Relation::Reply { in_reply_to: InReplyTo::new(owned_event_id!("$eventId")) });
+    content.relates_to = Some(Relation::Reply(Reply::with_event_id(owned_event_id!("$eventId"))));
     let without_relation = MessageType::from(content);
 
-    assert_eq!(
-        to_json_value(&without_relation).unwrap(),
+    assert_to_canonical_json_eq!(
+        without_relation,
         json!({
             "body": "Hello, world!",
             "msgtype": "m.text",
@@ -29,20 +28,18 @@ fn deserialize_room_message_content_without_relation() {
         "msgtype": "m.text",
     });
 
-    assert_matches!(from_json_value::<MessageType>(json_data), Ok(MessageType::Text(text)));
+    assert_let!(Ok(MessageType::Text(text)) = from_json_value::<MessageType>(json_data));
     assert_eq!(text.body, "Hello, world!");
 }
 
 #[test]
 fn convert_room_message_content_without_relation_to_full() {
     let mut content = RoomMessageEventContent::text_plain("Hello, world!");
-    content.relates_to =
-        Some(Relation::Reply { in_reply_to: InReplyTo::new(owned_event_id!("$eventId")) });
+    content.relates_to = Some(Relation::Reply(Reply::with_event_id(owned_event_id!("$eventId"))));
     let new_content = RoomMessageEventContent::from(MessageType::from(content));
 
-    assert_matches!(
-        new_content,
-        RoomMessageEventContent { msgtype: MessageType::Text(text), relates_to, .. }
+    assert_let!(
+        RoomMessageEventContent { msgtype: MessageType::Text(text), relates_to, .. } = new_content
     );
     assert_eq!(text.body, "Hello, world!");
     assert_matches!(relates_to, None);

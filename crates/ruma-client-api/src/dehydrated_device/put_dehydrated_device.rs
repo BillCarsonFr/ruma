@@ -10,26 +10,26 @@ pub mod unstable {
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedDeviceId, OwnedOneTimeKeyId,
+        api::{auth_scheme::AccessToken, request, response},
         encryption::{DeviceKeys, OneTimeKey},
         metadata,
         serde::Raw,
-        OwnedDeviceId, OwnedOneTimeKeyId,
     };
 
     use crate::dehydrated_device::DehydratedDeviceData;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             unstable => "/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
         }
-    };
+    }
 
     /// Request type for the `PUT` `dehydrated_device` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The unique ID of the device.
         pub device_id: OwnedDeviceId,
@@ -54,7 +54,7 @@ pub mod unstable {
     }
 
     /// Response type for the `upload_keys` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The unique ID of the device.
         pub device_id: OwnedDeviceId,

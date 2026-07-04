@@ -5,24 +5,25 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#post_matrixidentityv2accountregister
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#post_matrixidentityv2accountregister
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedServerName,
+        api::{auth_scheme::NoAccessToken, request, response},
         authentication::TokenType,
-        metadata, OwnedServerName,
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/account/register",
         }
-    };
+    }
 
     /// Request type for the `register_account` endpoint.
     #[request]

@@ -5,15 +5,15 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/push-gateway-api/#post_matrixpushv1notify
+    //! [spec]: https://spec.matrix.org/v1.18/push-gateway-api/#post_matrixpushv1notify
 
-    use js_int::{uint, UInt};
+    use js_int::{UInt, uint};
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedEventId, OwnedRoomAliasId, OwnedRoomId, OwnedUserId, SecondsSinceUnixEpoch,
+        api::{auth_scheme::NoAuthentication, request, response},
         metadata,
         push::{PushFormat, Tweak},
         serde::{JsonObject, StringEnum},
-        OwnedEventId, OwnedRoomAliasId, OwnedRoomId, OwnedUserId, SecondsSinceUnixEpoch,
     };
     use ruma_events::TimelineEventType;
     use serde::{Deserialize, Serialize};
@@ -21,14 +21,12 @@ pub mod v1 {
 
     use crate::PrivOwnedStr;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
-        authentication: None,
-        history: {
-            1.0 => "/_matrix/push/v1/notify",
-        }
-    };
+        authentication: NoAuthentication,
+        path: "/_matrix/push/v1/notify",
+    }
 
     /// Request type for the `send_event_notification` endpoint.
     #[request]
@@ -147,7 +145,7 @@ pub mod v1 {
     /// This type can hold an arbitrary string. To build this with a custom value, convert it from a
     /// string with `::from()` / `.into()`. To check for values that are not available as a
     /// documented variant here, use its string representation, obtained through `.as_str()`.
-    #[derive(Clone, Default, PartialEq, Eq, StringEnum)]
+    #[derive(Clone, Default, StringEnum)]
     #[ruma_enum(rename_all = "snake_case")]
     #[non_exhaustive]
     pub enum NotificationPriority {
@@ -272,11 +270,11 @@ pub mod v1 {
     mod tweak_serde {
         use std::fmt;
 
-        use ruma_common::push::Tweak;
+        use ruma_common::push::{HighlightTweakValue, Tweak};
         use serde::{
+            Deserializer, Serializer,
             de::{MapAccess, Visitor},
             ser::SerializeMap,
-            Deserializer, Serializer,
         };
 
         pub(super) fn serialize<S>(tweak: &[Tweak], serializer: S) -> Result<S::Ok, S::Error>
@@ -287,10 +285,15 @@ pub mod v1 {
             for item in tweak {
                 #[allow(unreachable_patterns)]
                 match item {
-                    Tweak::Highlight(b) => map.serialize_entry("highlight", b)?,
+                    Tweak::Highlight(value) => {
+                        map.serialize_entry("highlight", &(*value == HighlightTweakValue::Yes))?;
+                    }
                     Tweak::Sound(value) => map.serialize_entry("sound", value)?,
-                    Tweak::Custom { value, name } => map.serialize_entry(name, value)?,
-                    _ => unreachable!("variant added to Tweak not covered by Custom"),
+                    Tweak::_Custom(_) => map.serialize_entry(
+                        &item.set_tweak(),
+                        &item.value().expect("Tweak::_Custom variant should return a custom value"),
+                    )?,
+                    _ => unreachable!("variant added to Tweak not covered by _Custom"),
                 }
             }
             map.end()
@@ -317,17 +320,19 @@ pub mod v1 {
                         // true.
                         "highlight" => {
                             let highlight = access.next_value().unwrap_or(true);
-
-                            tweaks.push(Tweak::Highlight(highlight));
+                            tweaks.push(Tweak::Highlight(highlight.into()));
                         }
-                        _ => tweaks.push(Tweak::Custom { name: key, value: access.next_value()? }),
+                        _ => tweaks.push(
+                            Tweak::new(key.to_owned(), access.next_value()?)
+                                .map_err(serde::de::Error::custom)?,
+                        ),
                     }
                 }
 
                 // If no highlight tweak is given at all then the value of highlight is defined to
                 // be false.
                 if !tweaks.iter().any(|tw| matches!(tw, Tweak::Highlight(_))) {
-                    tweaks.push(Tweak::Highlight(false));
+                    tweaks.push(Tweak::Highlight(HighlightTweakValue::No));
                 }
 
                 Ok(tweaks)
@@ -346,44 +351,16 @@ pub mod v1 {
     mod tests {
         use js_int::uint;
         use ruma_common::{
-            owned_event_id, owned_room_alias_id, owned_room_id, owned_user_id,
-            SecondsSinceUnixEpoch,
+            SecondsSinceUnixEpoch, canonical_json::assert_to_canonical_json_eq, owned_event_id,
+            owned_room_alias_id, owned_room_id, owned_user_id, push::HighlightTweakValue,
         };
         use ruma_events::TimelineEventType;
-        use serde_json::{
-            from_value as from_json_value, json, to_value as to_json_value, Value as JsonValue,
-        };
+        use serde_json::{Value as JsonValue, from_value as from_json_value, json};
 
         use super::{Device, Notification, NotificationCounts, NotificationPriority, Tweak};
 
         #[test]
         fn serialize_request() {
-            let expected = json!({
-                "event_id": "$3957tyerfgewrf384",
-                "room_id": "!slw48wfj34rtnrf:example.com",
-                "type": "m.room.message",
-                "sender": "@exampleuser:matrix.org",
-                "sender_display_name": "Major Tom",
-                "room_alias": "#exampleroom:matrix.org",
-                "prio": "low",
-                "content": {},
-                "counts": {
-                  "unread": 2,
-                },
-                "devices": [
-                  {
-                    "app_id": "org.matrix.matrixConsole.ios",
-                    "pushkey": "V2h5IG9uIGVhcnRoIGRpZCB5b3UgZGVjb2RlIHRoaXM/",
-                    "pushkey_ts": 123,
-                    "tweaks": {
-                      "sound": "silence",
-                      "highlight": true,
-                      "custom": "go wild"
-                    }
-                  }
-                ]
-            });
-
             let eid = owned_event_id!("$3957tyerfgewrf384");
             let rid = owned_room_id!("!slw48wfj34rtnrf:example.com");
             let uid = owned_user_id!("@exampleuser:matrix.org");
@@ -394,12 +371,13 @@ pub mod v1 {
             let device = Device {
                 pushkey_ts: Some(SecondsSinceUnixEpoch(uint!(123))),
                 tweaks: vec![
-                    Tweak::Highlight(true),
+                    Tweak::Highlight(HighlightTweakValue::Yes),
                     Tweak::Sound("silence".into()),
-                    Tweak::Custom {
-                        name: "custom".into(),
-                        value: from_json_value(JsonValue::String("go wild".into())).unwrap(),
-                    },
+                    Tweak::new(
+                        "custom".into(),
+                        from_json_value(JsonValue::String("go wild".into())).unwrap(),
+                    )
+                    .unwrap(),
                 ],
                 ..Device::new(
                     "org.matrix.matrixConsole.ios".into(),
@@ -422,7 +400,34 @@ pub mod v1 {
                 ..Notification::default()
             };
 
-            assert_eq!(expected, to_json_value(notice).unwrap());
+            assert_to_canonical_json_eq!(
+                notice,
+                json!({
+                    "event_id": "$3957tyerfgewrf384",
+                    "room_id": "!slw48wfj34rtnrf:example.com",
+                    "type": "m.room.message",
+                    "sender": "@exampleuser:matrix.org",
+                    "sender_display_name": "Major Tom",
+                    "room_alias": "#exampleroom:matrix.org",
+                    "prio": "low",
+                    "content": {},
+                    "counts": {
+                      "unread": 2,
+                    },
+                    "devices": [
+                      {
+                        "app_id": "org.matrix.matrixConsole.ios",
+                        "pushkey": "V2h5IG9uIGVhcnRoIGRpZCB5b3UgZGVjb2RlIHRoaXM/",
+                        "pushkey_ts": 123,
+                        "tweaks": {
+                          "sound": "silence",
+                          "highlight": true,
+                          "custom": "go wild"
+                        },
+                      }
+                    ],
+                }),
+            );
         }
     }
 }

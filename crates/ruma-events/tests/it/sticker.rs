@@ -1,25 +1,28 @@
 use assert_matches2::assert_matches;
 use assign::assign;
-use js_int::{uint, UInt};
-use ruma_common::{mxc_uri, owned_event_id, serde::CanBeEmpty, MilliSecondsSinceUnixEpoch};
-use ruma_events::{
-    relation::Replacement,
-    room::{message::Relation, ImageInfo, MediaSource, ThumbnailInfo},
-    sticker::{StickerEventContent, StickerEventContentWithoutRelation, StickerMediaSource},
-    AnyMessageLikeEvent, MessageLikeEvent,
+use js_int::{UInt, uint};
+use ruma_common::{
+    MilliSecondsSinceUnixEpoch, canonical_json::assert_to_canonical_json_eq, owned_event_id,
+    owned_mxc_uri, serde::CanBeEmpty,
 };
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use ruma_events::{
+    AnyMessageLikeEvent, MessageLikeEvent,
+    relation::Replacement,
+    room::{ImageInfo, MediaSource, ThumbnailInfo, message::Relation},
+    sticker::{StickerEventContent, StickerEventContentWithoutRelation, StickerMediaSource},
+};
+use serde_json::{from_value as from_json_value, json};
 
 #[test]
 fn content_serialization() {
     let message_event_content = StickerEventContent::new(
         "Upload: my_image.jpg".to_owned(),
         ImageInfo::new(),
-        mxc_uri!("mxc://notareal.hs/file").to_owned(),
+        owned_mxc_uri!("mxc://notareal.hs/file"),
     );
 
-    assert_eq!(
-        to_json_value(&message_event_content).unwrap(),
+    assert_to_canonical_json_eq!(
+        message_event_content,
         json!({
             "body": "Upload: my_image.jpg",
             "url": "mxc://notareal.hs/file",
@@ -33,21 +36,21 @@ fn replace_content_serialization() {
     let mut message_event_content = StickerEventContent::new(
         "* Upload: my_image.jpg".to_owned(),
         ImageInfo::new(),
-        mxc_uri!("mxc://notareal.hs/file").to_owned(),
+        owned_mxc_uri!("mxc://notareal.hs/file"),
     );
     let old_event_id = owned_event_id!("$15827405538098VGFWH:example.com");
     let new_message_event_content = StickerEventContent::new(
         "Upload: my_image.jpg".to_owned(),
         ImageInfo::new(),
-        mxc_uri!("mxc://notareal.hs/file").to_owned(),
+        owned_mxc_uri!("mxc://notareal.hs/file"),
     );
     let new_content = StickerEventContentWithoutRelation::from(new_message_event_content);
     let replacement = Replacement::new(old_event_id.clone(), new_content);
     let relation = Relation::Replacement(replacement);
     message_event_content.relates_to = Some(relation);
 
-    assert_eq!(
-        to_json_value(&message_event_content).unwrap(),
+    assert_to_canonical_json_eq!(
+        message_event_content,
         json!({
             "body": "* Upload: my_image.jpg",
             "url": "mxc://notareal.hs/file",
@@ -80,31 +83,31 @@ fn event_serialization() {
                 mimetype: Some("image/png".into()),
                 size: UInt::new(82595),
             }))),
-            thumbnail_source: Some(MediaSource::Plain(mxc_uri!("mxc://matrix.org/irsns989Rrsn").to_owned())),
+            thumbnail_source: Some(MediaSource::Plain(owned_mxc_uri!("mxc://matrix.org/irsns989Rrsn"))),
         }),
-        mxc_uri!("mxc://matrix.org/rnsldl8srs98IRrs").to_owned(),
+        owned_mxc_uri!("mxc://matrix.org/rnsldl8srs98IRrs"),
     );
 
-    let actual = to_json_value(&content).unwrap();
-
-    let expected = json!({
-        "body": "Hello",
-        "info": {
-            "h": 423,
-            "mimetype": "image/png",
-            "size": 84242,
-            "thumbnail_info": {
-                "h": 334,
+    assert_to_canonical_json_eq!(
+        content,
+        json!({
+            "body": "Hello",
+            "info": {
+                "h": 423,
                 "mimetype": "image/png",
-                "size": 82595,
-                "w": 800
+                "size": 84242,
+                "thumbnail_info": {
+                    "h": 334,
+                    "mimetype": "image/png",
+                    "size": 82595,
+                    "w": 800,
+                },
+                "thumbnail_url": "mxc://matrix.org/irsns989Rrsn",
+                "w": 1011,
             },
-            "thumbnail_url": "mxc://matrix.org/irsns989Rrsn",
-            "w": 1011
-            },
-        "url": "mxc://matrix.org/rnsldl8srs98IRrs",
-    });
-    assert_eq!(actual, expected);
+            "url": "mxc://matrix.org/rnsldl8srs98IRrs",
+        }),
+    );
 }
 
 #[test]

@@ -2,21 +2,20 @@
 //!
 //! Get discovery information about the domain.
 //!
-//! [spec]: https://spec.matrix.org/latest/server-server-api/#getwell-knownmatrixserver
+//! [spec]: https://spec.matrix.org/v1.18/server-server-api/#getwell-knownmatrixserver
 
 use ruma_common::{
-    api::{request, response, Metadata},
-    metadata, OwnedServerName,
+    OwnedServerName,
+    api::{auth_scheme::NoAuthentication, request, response},
+    metadata,
 };
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: GET,
     rate_limited: false,
-    authentication: None,
-    history: {
-        1.0 => "/.well-known/matrix/server",
-    }
-};
+    authentication: NoAuthentication,
+    path: "/.well-known/matrix/server",
+}
 
 /// Request type for the `discover_homeserver` endpoint.
 #[request]

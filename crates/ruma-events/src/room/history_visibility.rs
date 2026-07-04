@@ -1,6 +1,6 @@
 //! Types for the [`m.room.history_visibility`] event.
 //!
-//! [`m.room.history_visibility`]: https://spec.matrix.org/latest/client-server-api/#mroomhistory_visibility
+//! [`m.room.history_visibility`]: https://spec.matrix.org/v1.18/client-server-api/#mroomhistory_visibility
 
 use ruma_common::serde::StringEnum;
 use ruma_macros::EventContent;
@@ -50,7 +50,7 @@ impl SyncRoomHistoryVisibilityEvent {
 
 /// Who can see a room's history.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum HistoryVisibility {

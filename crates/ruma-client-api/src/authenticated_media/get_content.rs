@@ -5,18 +5,19 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1mediadownloadservernamemediaid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1mediadownloadservernamemediaid
 
     use std::time::Duration;
 
     use http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
     use ruma_common::{
-        api::{request, response, Metadata},
+        IdParseError, MxcUri, OwnedServerName,
+        api::{auth_scheme::AccessToken, request, response},
         http_headers::ContentDisposition,
-        metadata, IdParseError, MxcUri, OwnedServerName,
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -24,10 +25,10 @@ pub mod v1 {
             unstable("org.matrix.msc3916") => "/_matrix/client/unstable/org.matrix.msc3916/media/download/{server_name}/{media_id}",
             1.11 | stable("org.matrix.msc3916.stable") => "/_matrix/client/v1/media/download/{server_name}/{media_id}",
         }
-    };
+    }
 
     /// Request type for the `get_media_content` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The server name from the mxc:// URI (the authoritory component).
         #[ruma_api(path)]
@@ -51,7 +52,7 @@ pub mod v1 {
     }
 
     /// Response type for the `get_media_content` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The content that was previously uploaded.
         #[ruma_api(raw_body)]

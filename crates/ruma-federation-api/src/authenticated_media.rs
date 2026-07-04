@@ -11,8 +11,10 @@ pub mod get_content_thumbnail;
 /// The `multipart/mixed` mime "essence".
 const MULTIPART_MIXED: &str = "multipart/mixed";
 /// The maximum number of headers to parse in a body part.
+#[cfg(feature = "client")]
 const MAX_HEADERS_COUNT: usize = 32;
 /// The length of the generated boundary.
+#[cfg(feature = "server")]
 const GENERATED_BOUNDARY_LENGTH: usize = 30;
 
 /// The metadata of a file from the content repository.
@@ -78,10 +80,10 @@ fn try_into_multipart_mixed_response<T: Default + bytes::BufMut>(
 ) -> Result<http::Response<T>, ruma_common::api::error::IntoHttpError> {
     use std::io::Write as _;
 
-    use rand::Rng as _;
+    use rand::RngExt as _;
 
-    let boundary = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
+    let boundary = rand::rng()
+        .sample_iter(&rand::distr::Alphanumeric)
         .map(char::from)
         .take(GENERATED_BOUNDARY_LENGTH)
         .collect::<String>();
@@ -146,7 +148,7 @@ fn try_from_multipart_mixed_response<T: AsRef<[u8]>>(
     http_response: http::Response<T>,
 ) -> Result<
     (ContentMetadata, FileOrLocation),
-    ruma_common::api::error::FromHttpResponseError<ruma_common::api::error::MatrixError>,
+    ruma_common::api::error::FromHttpResponseError<ruma_common::api::error::Error>,
 > {
     use ruma_common::api::error::{HeaderDeserializationError, MultipartMixedDeserializationError};
 
@@ -301,8 +303,8 @@ mod tests {
     use ruma_common::http_headers::{ContentDisposition, ContentDispositionType};
 
     use super::{
-        try_from_multipart_mixed_response, try_into_multipart_mixed_response, Content,
-        ContentMetadata, FileOrLocation,
+        Content, ContentMetadata, FileOrLocation, try_from_multipart_mixed_response,
+        try_into_multipart_mixed_response,
     };
 
     #[test]

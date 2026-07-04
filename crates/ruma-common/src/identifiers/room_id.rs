@@ -3,8 +3,8 @@
 use ruma_macros::IdDst;
 
 use super::{
-    matrix_uri::UriAction, IdParseError, MatrixToUri, MatrixUri, OwnedEventId, OwnedServerName,
-    ServerName,
+    IdParseError, MatrixToUri, MatrixUri, OwnedEventId, OwnedServerName, ServerName,
+    matrix_uri::UriAction,
 };
 use crate::RoomOrAliasId;
 
@@ -18,7 +18,7 @@ use crate::RoomOrAliasId;
 /// assert_eq!(<&RoomId>::try_from("!n8f893n9:example.com").unwrap(), "!n8f893n9:example.com");
 /// ```
 ///
-/// [room ID]: https://spec.matrix.org/latest/appendices/#room-ids
+/// [room ID]: https://spec.matrix.org/v1.18/appendices/#room-ids
 #[repr(transparent)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, IdDst)]
 #[ruma_id(validate = ruma_identifiers_validation::room_id::validate)]
@@ -37,7 +37,10 @@ impl RoomId {
     /// [`RoomVersionRules`]: crate::room_version_rules::RoomVersionRules
     #[cfg(feature = "rand")]
     pub fn new_v1(server_name: &ServerName) -> OwnedRoomId {
-        Self::from_borrowed(&format!("!{}:{server_name}", super::generate_localpart(18))).to_owned()
+        OwnedRoomId::from_string_unchecked(format!(
+            "!{}:{server_name}",
+            super::generate_localpart(18)
+        ))
     }
 
     /// Construct an `OwnedRoomId` using the reference hash of the `m.room.create` event of the
@@ -53,7 +56,7 @@ impl RoomId {
     /// [`RoomIdFormatVersion::V2`]: crate::room_version_rules::RoomIdFormatVersion::V2
     /// [`RoomVersionRules`]: crate::room_version_rules::RoomVersionRules
     pub fn new_v2(room_create_reference_hash: &str) -> Result<OwnedRoomId, IdParseError> {
-        Self::parse(format!("!{room_create_reference_hash}"))
+        OwnedRoomId::try_from(format!("!{room_create_reference_hash}"))
     }
 
     /// Returns the room ID without the initial `!` sigil.
@@ -113,7 +116,7 @@ impl RoomId {
     /// );
     /// ```
     ///
-    /// [routing algorithm]: https://spec.matrix.org/latest/appendices/#routing
+    /// [routing algorithm]: https://spec.matrix.org/v1.18/appendices/#routing
     pub fn matrix_to_uri_via<T>(&self, via: T) -> MatrixToUri
     where
         T: IntoIterator,
@@ -137,7 +140,7 @@ impl RoomId {
     ///
     /// If you don't have a list of servers, you can use [`RoomId::matrix_to_event_uri()`] instead.
     ///
-    /// [routing algorithm]: https://spec.matrix.org/latest/appendices/#routing
+    /// [routing algorithm]: https://spec.matrix.org/v1.18/appendices/#routing
     pub fn matrix_to_event_uri_via<T>(&self, ev_id: impl Into<OwnedEventId>, via: T) -> MatrixToUri
     where
         T: IntoIterator,
@@ -167,7 +170,7 @@ impl RoomId {
     /// );
     /// ```
     pub fn matrix_uri(&self, join: bool) -> MatrixUri {
-        MatrixUri::new(self.into(), vec![], Some(UriAction::Join).filter(|_| join))
+        MatrixUri::new(self.into(), vec![], join.then_some(UriAction::Join))
     }
 
     /// Create a `matrix:` URI for this room ID with a list of servers that should know it.
@@ -194,7 +197,7 @@ impl RoomId {
     /// );
     /// ```
     ///
-    /// [routing algorithm]: https://spec.matrix.org/latest/appendices/#routing
+    /// [routing algorithm]: https://spec.matrix.org/v1.18/appendices/#routing
     pub fn matrix_uri_via<T>(&self, via: T, join: bool) -> MatrixUri
     where
         T: IntoIterator,
@@ -203,7 +206,7 @@ impl RoomId {
         MatrixUri::new(
             self.into(),
             via.into_iter().map(Into::into).collect(),
-            Some(UriAction::Join).filter(|_| join),
+            join.then_some(UriAction::Join),
         )
     }
 
@@ -222,7 +225,7 @@ impl RoomId {
     ///
     /// If you don't have a list of servers, you can use [`RoomId::matrix_event_uri()`] instead.
     ///
-    /// [routing algorithm]: https://spec.matrix.org/latest/appendices/#routing
+    /// [routing algorithm]: https://spec.matrix.org/v1.18/appendices/#routing
     pub fn matrix_event_uri_via<T>(&self, ev_id: impl Into<OwnedEventId>, via: T) -> MatrixUri
     where
         T: IntoIterator,
@@ -239,7 +242,7 @@ impl RoomId {
 #[cfg(test)]
 mod tests {
     use super::{OwnedRoomId, RoomId};
-    use crate::{server_name, IdParseError};
+    use crate::{IdParseError, server_name};
 
     #[test]
     fn valid_room_id() {

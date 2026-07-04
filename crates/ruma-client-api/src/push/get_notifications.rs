@@ -5,20 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3notifications
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3notifications
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        MilliSecondsSinceUnixEpoch, OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         push::Action,
         serde::Raw,
-        MilliSecondsSinceUnixEpoch, OwnedRoomId,
     };
     use ruma_events::AnySyncTimelineEvent;
     use serde::{Deserialize, Serialize};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/notifications",
             1.1 => "/_matrix/client/v3/notifications",
         }
-    };
+    }
 
     /// Request type for the `get_notifications` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {
         /// Pagination token given to retrieve the next set of events.
@@ -52,7 +52,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_notifications` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The token to supply in the from param of the next /notifications request in order to
         /// request more events.

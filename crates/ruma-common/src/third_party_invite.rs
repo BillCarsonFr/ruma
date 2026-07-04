@@ -1,14 +1,14 @@
 //! Common types for [third-party invites].
 //!
-//! [third-party invites]: https://spec.matrix.org/latest/client-server-api/#third-party-invites
+//! [third-party invites]: https://spec.matrix.org/v1.18/client-server-api/#third-party-invites
 
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
 use crate::serde::{
-    base64::{Standard, UrlSafe},
     Base64, Base64DecodeError,
+    base64::{Standard, UrlSafe},
 };
 
 /// A base64-encoded public key from an [identity server].
@@ -20,7 +20,7 @@ use crate::serde::{
 ///
 /// The key can be decoded by calling [`IdentityServerBase64PublicKey::decode()`].
 ///
-/// [identity server]: https://spec.matrix.org/latest/identity-service-api/
+/// [identity server]: https://spec.matrix.org/v1.18/identity-service-api/
 /// [compatibility with Sydent]: https://github.com/matrix-org/sydent/issues/593
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[allow(clippy::exhaustive_structs)]

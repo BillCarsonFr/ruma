@@ -3,35 +3,36 @@
 use assert_matches2::assert_matches;
 use js_int::uint;
 use ruma_common::{
-    mxc_uri, owned_event_id,
-    serde::{Base64, CanBeEmpty},
     MilliSecondsSinceUnixEpoch,
+    canonical_json::assert_to_canonical_json_eq,
+    owned_event_id, owned_mxc_uri,
+    serde::{Base64, CanBeEmpty},
 };
 use ruma_events::{
-    file::{CaptionContentBlock, EncryptedContentInit, FileContentBlock},
+    AnyMessageLikeEvent, MessageLikeEvent,
+    file::{CaptionContentBlock, EncryptedContent, FileContentBlock},
     image::{
         ImageDetailsContentBlock, ImageEventContent, Thumbnail, ThumbnailFileContentBlock,
         ThumbnailImageDetailsContentBlock,
     },
     message::TextContentBlock,
-    relation::InReplyTo,
-    room::{message::Relation, JsonWebKeyInit},
-    AnyMessageLikeEvent, MessageLikeEvent,
+    relation::Reply,
+    room::{EncryptedFileHash, V2EncryptedFileInfo, message::Relation},
 };
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use serde_json::{from_value as from_json_value, json};
 
 #[test]
 fn plain_content_serialization() {
     let event_content = ImageEventContent::with_plain_text(
         "Upload: my_image.jpg",
         FileContentBlock::plain(
-            mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+            owned_mxc_uri!("mxc://notareal.hs/abcdef"),
             "my_image.jpg".to_owned(),
         ),
     );
 
-    assert_eq!(
-        to_json_value(&event_content).unwrap(),
+    assert_to_canonical_json_eq!(
+        event_content,
         json!({
             "org.matrix.msc1767.text": [
                 { "body": "Upload: my_image.jpg" },
@@ -49,31 +50,24 @@ fn encrypted_content_serialization() {
     let event_content = ImageEventContent::with_plain_text(
         "Upload: my_image.jpg",
         FileContentBlock::encrypted(
-            mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+            owned_mxc_uri!("mxc://notareal.hs/abcdef"),
             "my_image.jpg".to_owned(),
-            EncryptedContentInit {
-                key: JsonWebKeyInit {
-                    kty: "oct".to_owned(),
-                    key_ops: vec!["encrypt".to_owned(), "decrypt".to_owned()],
-                    alg: "A256CTR".to_owned(),
-                    k: Base64::parse("TLlG_OpX807zzQuuwv4QZGJ21_u7weemFGYJFszMn9A").unwrap(),
-                    ext: true,
-                }
+            EncryptedContent::new(
+                V2EncryptedFileInfo::new(
+                    Base64::parse("TLlG_OpX807zzQuuwv4QZGJ21_u7weemFGYJFszMn9A").unwrap(),
+                    Base64::parse("S22dq3NAX8wAAAAAAAAAAA").unwrap(),
+                )
                 .into(),
-                iv: Base64::parse("S22dq3NAX8wAAAAAAAAAAA").unwrap(),
-                hashes: [(
-                    "sha256".to_owned(),
+                std::iter::once(EncryptedFileHash::Sha256(
                     Base64::parse("aWOHudBnDkJ9IwaR1Nd8XKoI7DOrqDTwt6xDPfVGN6Q").unwrap(),
-                )]
-                .into(),
-                v: "v2".to_owned(),
-            }
-            .into(),
+                ))
+                .collect(),
+            ),
         ),
     );
 
-    assert_eq!(
-        to_json_value(&event_content).unwrap(),
+    assert_to_canonical_json_eq!(
+        event_content,
         json!({
             "org.matrix.msc1767.text": [
                 { "body": "Upload: my_image.jpg" },
@@ -83,7 +77,7 @@ fn encrypted_content_serialization() {
                 "name": "my_image.jpg",
                 "key": {
                     "kty": "oct",
-                    "key_ops": ["encrypt", "decrypt"],
+                    "key_ops": ["decrypt", "encrypt"],
                     "alg": "A256CTR",
                     "k": "TLlG_OpX807zzQuuwv4QZGJ21_u7weemFGYJFszMn9A",
                     "ext": true
@@ -103,7 +97,7 @@ fn image_event_serialization() {
     let mut content = ImageEventContent::new(
         TextContentBlock::html("Upload: my_house.jpg", "Upload: <strong>my_house.jpg</strong>"),
         FileContentBlock::plain(
-            mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+            owned_mxc_uri!("mxc://notareal.hs/abcdef"),
             "my_house.jpg".to_owned(),
         ),
     );
@@ -113,7 +107,7 @@ fn image_event_serialization() {
     content.image_details = Some(ImageDetailsContentBlock::new(uint!(1920), uint!(1080)));
     let mut thumbnail = Thumbnail::new(
         ThumbnailFileContentBlock::plain(
-            mxc_uri!("mxc://notareal.hs/thumbnail").to_owned(),
+            owned_mxc_uri!("mxc://notareal.hs/thumbnail"),
             "image/jpeg".to_owned(),
         ),
         ThumbnailImageDetailsContentBlock::new(uint!(560), uint!(480)),
@@ -121,12 +115,11 @@ fn image_event_serialization() {
     thumbnail.file.size = Some(uint!(334_593));
     content.thumbnail = vec![thumbnail].into();
     content.caption = Some(CaptionContentBlock::plain("This is my house"));
-    content.relates_to = Some(Relation::Reply {
-        in_reply_to: InReplyTo::new(owned_event_id!("$replyevent:example.com")),
-    });
+    content.relates_to =
+        Some(Relation::Reply(Reply::with_event_id(owned_event_id!("$replyevent:example.com"))));
 
-    assert_eq!(
-        to_json_value(&content).unwrap(),
+    assert_to_canonical_json_eq!(
+        content,
         json!({
             "org.matrix.msc1767.text": [
                 { "mimetype": "text/html", "body": "Upload: <strong>my_house.jpg</strong>" },

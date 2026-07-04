@@ -5,22 +5,22 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidstateeventtypestatekey
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3roomsroomidstateeventtypestatekey
 
     use std::borrow::Borrow;
 
     use ruma_common::{
-        api::{response, Metadata},
+        MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId,
+        api::{auth_scheme::AccessToken, error::Error, response},
         metadata,
         serde::Raw,
-        MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId,
     };
     #[cfg(feature = "unstable-msc4354")]
     use ruma_events::StickyDurationMs;
     use ruma_events::{AnyStateEventContent, StateEventContent, StateEventType};
     use serde_json::value::to_raw_value as to_raw_json_value;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
@@ -28,7 +28,7 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/state/{event_type}/{state_key}",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/state/{event_type}/{state_key}",
         }
-    };
+    }
 
     /// Request type for the `send_state_event` endpoint.
     #[derive(Clone, Debug)]
@@ -52,7 +52,7 @@ pub mod v3 {
         ///
         /// Note that this does not change the position of the event in the timeline.
         ///
-        /// [timestamp massaging]: https://spec.matrix.org/latest/application-service-api/#timestamp-massaging
+        /// [timestamp massaging]: https://spec.matrix.org/v1.18/application-service-api/#timestamp-massaging
         pub timestamp: Option<MilliSecondsSinceUnixEpoch>,
 
         /// The duration to stick the event for.
@@ -115,7 +115,7 @@ pub mod v3 {
     }
 
     /// Response type for the `send_state_event` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A unique identifier for the event.
         pub event_id: OwnedEventId,
@@ -130,18 +130,16 @@ pub mod v3 {
 
     #[cfg(feature = "client")]
     impl ruma_common::api::OutgoingRequest for Request {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
         type IncomingResponse = Response;
 
-        const METADATA: Metadata = METADATA;
-
-        fn try_into_http_request<T: Default + bytes::BufMut>(
+        fn try_into_http_request<T: Default + bytes::BufMut + AsRef<[u8]>>(
             self,
             base_url: &str,
-            access_token: ruma_common::api::SendAccessToken<'_>,
-            considering: &'_ ruma_common::api::SupportedVersions,
+            access_token: ruma_common::api::auth_scheme::SendAccessToken<'_>,
+            considering: std::borrow::Cow<'_, ruma_common::api::SupportedVersions>,
         ) -> Result<http::Request<T>, ruma_common::api::error::IntoHttpError> {
-            use http::header::{self, HeaderValue};
+            use ruma_common::api::{Metadata, auth_scheme::AuthScheme};
 
             let query_string = serde_html_form::to_string(RequestQuery {
                 timestamp: self.timestamp,
@@ -149,25 +147,20 @@ pub mod v3 {
                 sticky_duration_ms: self.sticky_duration_ms,
             })?;
 
-            let http_request = http::Request::builder()
-                .method(http::Method::PUT)
-                .uri(METADATA.make_endpoint_url(
+            let mut http_request = http::Request::builder()
+                .method(Self::METHOD)
+                .uri(Self::make_endpoint_url(
                     considering,
                     base_url,
                     &[&self.room_id, &self.event_type, &self.state_key],
                     &query_string,
                 )?)
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(
-                    header::AUTHORIZATION,
-                    HeaderValue::from_str(&format!(
-                        "Bearer {}",
-                        access_token
-                            .get_required_for_endpoint()
-                            .ok_or(ruma_common::api::error::IntoHttpError::NeedsAuthentication)?
-                    ))?,
-                )
+                .header(http::header::CONTENT_TYPE, ruma_common::http_headers::APPLICATION_JSON)
                 .body(ruma_common::serde::json_to_buf(&self.body)?)?;
+
+            Self::Authentication::add_authentication(&mut http_request, access_token).map_err(
+                |error| ruma_common::api::error::IntoHttpError::Authentication(error.into()),
+            )?;
 
             Ok(http_request)
         }
@@ -175,10 +168,8 @@ pub mod v3 {
 
     #[cfg(feature = "server")]
     impl ruma_common::api::IncomingRequest for Request {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
         type OutgoingResponse = Response;
-
-        const METADATA: Metadata = METADATA;
 
         fn try_from_http_request<B, S>(
             request: http::Request<B>,
@@ -188,6 +179,8 @@ pub mod v3 {
             B: AsRef<[u8]>,
             S: AsRef<str>,
         {
+            Self::check_request_method(request.method())?;
+
             // FIXME: find a way to make this if-else collapse with serde recognizing trailing
             // Option
             let (room_id, event_type, state_key): (OwnedRoomId, StateEventType, String) =
@@ -213,7 +206,9 @@ pub mod v3 {
             let request_query: RequestQuery =
                 serde_html_form::from_str(request.uri().query().unwrap_or(""))?;
 
-            let body = serde_json::from_slice(request.body().as_ref())?;
+            let body: Raw<AnyStateEventContent> = ruma_common::serde::deserialize_raw_object(
+                &mut serde_json::Deserializer::from_slice(request.body().as_ref()),
+            )?;
 
             Ok(Self {
                 room_id,
@@ -242,5 +237,44 @@ pub mod v3 {
             rename = "org.matrix.msc4354.sticky_duration_ms"
         )]
         pub sticky_duration_ms: Option<StickyDurationMs>,
+    }
+
+    #[cfg(feature = "client")]
+    #[test]
+    fn serialize() {
+        use std::borrow::Cow;
+
+        use ruma_common::{
+            api::{
+                MatrixVersion, OutgoingRequest as _, SupportedVersions,
+                auth_scheme::SendAccessToken,
+            },
+            owned_room_id,
+        };
+        use ruma_events::{EmptyStateKey, room::name::RoomNameEventContent};
+
+        let supported = SupportedVersions {
+            versions: [MatrixVersion::V1_1].into(),
+            features: Default::default(),
+        };
+
+        // This used to panic in make_endpoint_url because of a mismatch in the path parameter count
+        let req = Request::new(
+            owned_room_id!("!room:server.tld"),
+            &EmptyStateKey,
+            &RoomNameEventContent::new("Test room".to_owned()),
+        )
+        .unwrap()
+        .try_into_http_request::<Vec<u8>>(
+            "https://server.tld",
+            SendAccessToken::IfRequired("access_token"),
+            Cow::Owned(supported),
+        )
+        .unwrap();
+
+        assert_eq!(
+            req.uri(),
+            "https://server.tld/_matrix/client/v3/rooms/!room:server.tld/state/m.room.name/"
+        );
     }
 }

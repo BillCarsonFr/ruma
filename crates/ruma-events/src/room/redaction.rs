@@ -1,16 +1,15 @@
 //! Types for the [`m.room.redaction`] event.
 //!
-//! [`m.room.redaction`]: https://spec.matrix.org/latest/client-server-api/#mroomredaction
+//! [`m.room.redaction`]: https://spec.matrix.org/v1.18/client-server-api/#mroomredaction
 
 use as_variant::as_variant;
 use js_int::Int;
-#[cfg(feature = "canonical-json")]
-use ruma_common::canonical_json::RedactionEvent;
 use ruma_common::{
-    room_version_rules::RedactionRules,
-    serde::{CanBeEmpty, JsonCastable, JsonObject},
     EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedTransactionId,
     OwnedUserId, RoomId, UserId,
+    canonical_json::RedactionEvent,
+    room_version_rules::RedactionRules,
+    serde::{CanBeEmpty, JsonCastable, JsonObject},
 };
 use ruma_macros::{Event, EventContent};
 use serde::{Deserialize, Serialize};
@@ -53,7 +52,7 @@ impl JsonCastable<JsonObject> for SyncRoomRedactionEvent {}
 
 /// Redaction event.
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OriginalRoomRedactionEvent {
     /// Data specific to the event type.
     pub content: RoomRedactionEventContent,
@@ -105,7 +104,7 @@ impl JsonCastable<JsonObject> for OriginalRoomRedactionEvent {}
 
 /// Redacted redaction event.
 #[derive(Clone, Debug, Event)]
-#[allow(clippy::exhaustive_structs)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedRoomRedactionEvent {
     /// Data specific to the event type.
     pub content: RedactedRoomRedactionEventContent,
@@ -136,7 +135,7 @@ impl JsonCastable<JsonObject> for RedactedRoomRedactionEvent {}
 
 /// Redaction event without a `room_id`.
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OriginalSyncRoomRedactionEvent {
     /// Data specific to the event type.
     pub content: RoomRedactionEventContent,
@@ -186,7 +185,7 @@ impl JsonCastable<JsonObject> for OriginalSyncRoomRedactionEvent {}
 
 /// Redacted redaction event without a `room_id`.
 #[derive(Clone, Debug, Event)]
-#[allow(clippy::exhaustive_structs)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedSyncRoomRedactionEvent {
     /// Data specific to the event type.
     pub content: RedactedRoomRedactionEventContent,
@@ -435,13 +434,12 @@ impl OriginalSyncRoomRedactionEvent {
     }
 }
 
-#[cfg(feature = "canonical-json")]
 impl RedactionEvent for OriginalRoomRedactionEvent {}
-#[cfg(feature = "canonical-json")]
+
 impl RedactionEvent for OriginalSyncRoomRedactionEvent {}
-#[cfg(feature = "canonical-json")]
+
 impl RedactionEvent for RoomRedactionEvent {}
-#[cfg(feature = "canonical-json")]
+
 impl RedactionEvent for SyncRoomRedactionEvent {}
 
 /// Extra information about a redaction that is not incorporated into the event's hash.
@@ -461,7 +459,7 @@ pub struct RoomRedactionUnsigned {
 
     /// [Bundled aggregations] of related child events.
     ///
-    /// [Bundled aggregations]: https://spec.matrix.org/latest/client-server-api/#aggregations-of-child-events
+    /// [Bundled aggregations]: https://spec.matrix.org/v1.18/client-server-api/#aggregations-of-child-events
     #[serde(rename = "m.relations", default)]
     pub relations: BundledMessageLikeRelations<OriginalSyncRoomRedactionEvent>,
 }

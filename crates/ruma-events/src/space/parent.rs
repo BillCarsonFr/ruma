@@ -1,6 +1,6 @@
 //! Types for the [`m.space.parent`] event.
 //!
-//! [`m.space.parent`]: https://spec.matrix.org/latest/client-server-api/#mspaceparent
+//! [`m.space.parent`]: https://spec.matrix.org/v1.18/client-server-api/#mspaceparent
 
 use ruma_common::{OwnedRoomId, OwnedServerName};
 use ruma_macros::EventContent;
@@ -40,34 +40,46 @@ impl SpaceParentEventContent {
     }
 }
 
+impl PossiblyRedactedSpaceParentEventContent {
+    /// Whether this `PossiblyRedactedSpaceParentEventContent` is valid according to the Matrix
+    /// specification.
+    ///
+    /// The room in the state key of the event should only be considered a parent space of this room
+    /// if this returns `true`.
+    ///
+    /// Returns `false` if the `via` field is `None`.
+    pub fn is_valid(&self) -> bool {
+        self.via.is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use ruma_common::server_name;
-    use serde_json::{json, to_value as to_json_value};
+    use ruma_common::{canonical_json::assert_to_canonical_json_eq, owned_server_name};
+    use serde_json::json;
 
     use super::SpaceParentEventContent;
 
     #[test]
     fn space_parent_serialization() {
         let content = SpaceParentEventContent {
-            via: vec![server_name!("example.com").to_owned()],
+            via: vec![owned_server_name!("example.com")],
             canonical: true,
         };
 
-        let json = json!({
-            "via": ["example.com"],
-            "canonical": true,
-        });
-
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "via": ["example.com"],
+                "canonical": true,
+            })
+        );
     }
 
     #[test]
     fn space_parent_empty_serialization() {
         let content = SpaceParentEventContent { via: vec![], canonical: false };
 
-        let json = json!({ "via": [] });
-
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(content, json!({ "via": [] }));
     }
 }

@@ -1,9 +1,9 @@
-use serde::{ser::SerializeStruct as _, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct as _};
 
 /// Specifies options for [lazy-loading membership events][lazy-loading] on
 /// supported endpoints
 ///
-/// [lazy-loading]: https://spec.matrix.org/latest/client-server-api/#lazy-loading-room-members
+/// [lazy-loading]: https://spec.matrix.org/v1.18/client-server-api/#lazy-loading-room-members
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Deserialize)]
 #[serde(from = "LazyLoadJsonRepr")]
 #[allow(clippy::exhaustive_enums)]
@@ -73,27 +73,28 @@ impl From<LazyLoadJsonRepr> for LazyLoadOptions {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::canonical_json::assert_to_canonical_json_eq;
+    use serde_json::{from_value as from_json_value, json};
 
     use super::LazyLoadOptions;
 
     #[test]
     fn serialize_disabled() {
         let lazy_load_options = LazyLoadOptions::Disabled;
-        assert_eq!(to_json_value(lazy_load_options).unwrap(), json!({}));
+        assert_to_canonical_json_eq!(lazy_load_options, json!({}));
     }
 
     #[test]
     fn serialize_no_redundant() {
         let lazy_load_options = LazyLoadOptions::Enabled { include_redundant_members: false };
-        assert_eq!(to_json_value(lazy_load_options).unwrap(), json!({ "lazy_load_members": true }));
+        assert_to_canonical_json_eq!(lazy_load_options, json!({ "lazy_load_members": true }));
     }
 
     #[test]
     fn serialize_with_redundant() {
         let lazy_load_options = LazyLoadOptions::Enabled { include_redundant_members: true };
-        assert_eq!(
-            to_json_value(lazy_load_options).unwrap(),
+        assert_to_canonical_json_eq!(
+            lazy_load_options,
             json!({ "lazy_load_members": true, "include_redundant_members": true })
         );
     }

@@ -2,24 +2,27 @@
 //!
 //! Register an account on this homeserver.
 
-use serde::{Deserialize, Serialize};
+use ruma_common::serde::StringEnum;
+
+use crate::PrivOwnedStr;
 
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3register
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3register
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedDeviceId, OwnedUserId,
+        OwnedDeviceId, OwnedUserId,
+        api::{auth_scheme::AppserviceTokenOptional, request, response},
+        metadata,
     };
 
     use super::{LoginType, RegistrationKind};
     use crate::uiaa::{AuthData, UiaaResponse};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AppserviceTokenOptional,
@@ -27,7 +30,7 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/register",
             1.1 => "/_matrix/client/v3/register",
         }
-    };
+    }
 
     /// Request type for the `register` endpoint.
     #[request(error = UiaaResponse)]
@@ -85,13 +88,13 @@ pub mod v3 {
         /// Appservices can [bypass the registration flows][admin] entirely by providing their
         /// token in the header and setting this login `type` to `m.login.application_service`.
         ///
-        /// [admin]: https://spec.matrix.org/latest/application-service-api/#server-admin-style-permissions
+        /// [admin]: https://spec.matrix.org/v1.18/application-service-api/#server-admin-style-permissions
         #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
         pub login_type: Option<LoginType>,
 
         /// If set to `true`, the client supports [refresh tokens].
         ///
-        /// [refresh tokens]: https://spec.matrix.org/latest/client-server-api/#refreshing-access-tokens
+        /// [refresh tokens]: https://spec.matrix.org/v1.18/client-server-api/#refreshing-access-tokens
         #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
         pub refresh_token: bool,
 
@@ -99,7 +102,7 @@ pub mod v3 {
         ///
         /// If this is set, the `username` field is also required.
         ///
-        /// [guest user]: https://spec.matrix.org/latest/client-server-api/#guest-access
+        /// [guest user]: https://spec.matrix.org/v1.18/client-server-api/#guest-access
         #[serde(skip_serializing_if = "Option::is_none")]
         pub guest_access_token: Option<String>,
     }
@@ -132,7 +135,7 @@ pub mod v3 {
         ///
         /// Omitted if the request's `inhibit_login` was set to `true`.
         ///
-        /// [refresh token]: https://spec.matrix.org/latest/client-server-api/#refreshing-access-tokens
+        /// [refresh token]: https://spec.matrix.org/v1.18/client-server-api/#refreshing-access-tokens
         /// [`refresh_token`]: crate::session::refresh_token
         #[serde(skip_serializing_if = "Option::is_none")]
         pub refresh_token: Option<String>,
@@ -177,25 +180,33 @@ pub mod v3 {
 }
 
 /// The kind of account being registered.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
+#[derive(Clone, Default, StringEnum)]
+#[ruma_enum(rename_all = "snake_case")]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub enum RegistrationKind {
-    /// A guest account
+    /// A guest account.
     ///
     /// These accounts may have limited permissions and may not be supported by all servers.
     Guest,
 
-    /// A regular user account
+    /// A regular user account.
     #[default]
     User,
+
+    #[doc(hidden)]
+    _Custom(PrivOwnedStr),
 }
 
 /// The login type.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
+#[derive(Clone, StringEnum)]
+#[ruma_enum(rename_all(prefix = "m.login.", rule = "snake_case"))]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub enum LoginType {
-    /// An appservice-specific login type
-    #[serde(rename = "m.login.application_service")]
+    /// An appservice-specific login type.
     ApplicationService,
+
+    #[doc(hidden)]
+    _Custom(PrivOwnedStr),
 }

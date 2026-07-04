@@ -1,11 +1,11 @@
 //! Types for the [`m.room.avatar`] event.
 //!
-//! [`m.room.avatar`]: https://spec.matrix.org/latest/client-server-api/#mroomavatar
+//! [`m.room.avatar`]: https://spec.matrix.org/v1.18/client-server-api/#mroomavatar
 
 use js_int::UInt;
+use ruma_common::OwnedMxcUri;
 #[cfg(feature = "unstable-msc2448")]
 use ruma_common::serde::Base64;
-use ruma_common::OwnedMxcUri;
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
 

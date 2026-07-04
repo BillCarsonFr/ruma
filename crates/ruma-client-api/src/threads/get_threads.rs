@@ -5,20 +5,20 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1roomsroomidthreads
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1roomsroomidthreads
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::{Raw, StringEnum},
-        OwnedRoomId,
     };
     use ruma_events::AnyTimelineEvent;
 
     use crate::PrivOwnedStr;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v1 {
             unstable => "/_matrix/client/unstable/org.matrix.msc3856/rooms/{room_id}/threads",
             1.4 => "/_matrix/client/v1/rooms/{room_id}/threads",
         }
-    };
+    }
 
     /// Request type for the `get_thread_roots` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room ID where the thread roots are located.
         #[ruma_api(path)]
@@ -57,7 +57,7 @@ pub mod v1 {
     }
 
     /// Response type for the `get_thread_roots` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The thread roots, ordered by the `latest_event` in each event's aggregation bundle.
         ///
@@ -88,7 +88,7 @@ pub mod v1 {
 
     /// Which threads to include in the response.
     #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-    #[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, StringEnum)]
+    #[derive(Clone, Default, StringEnum)]
     #[ruma_enum(rename_all = "lowercase")]
     #[non_exhaustive]
     pub enum IncludeThreads {
@@ -104,7 +104,7 @@ pub mod v1 {
         ///
         /// Only include thread roots for threads where [`current_user_participated`] is `true`.
         ///
-        /// [`current_user_participated`]: https://spec.matrix.org/latest/client-server-api/#server-side-aggregation-of-mthread-relationships
+        /// [`current_user_participated`]: https://spec.matrix.org/v1.18/client-server-api/#server-side-aggregation-of-mthread-relationships
         Participated,
 
         #[doc(hidden)]

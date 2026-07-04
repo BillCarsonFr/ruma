@@ -5,16 +5,16 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3thirdpartylocation
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3thirdpartylocation
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomAliasId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         thirdparty::Location,
-        OwnedRoomAliasId,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -22,10 +22,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/thirdparty/location",
             1.1 => "/_matrix/client/v3/thirdparty/location",
         }
-    };
+    }
 
     /// Request type for the `get_location_for_room_alias` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The Matrix room alias to look up.
         #[ruma_api(query)]
@@ -33,7 +33,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_location_for_room_alias` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// List of matched third party locations.
         #[ruma_api(body)]

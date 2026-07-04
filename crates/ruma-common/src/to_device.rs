@@ -1,12 +1,12 @@
 //! Common types for the Send-To-Device Messaging
 //!
-//! [send-to-device]: https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging
+//! [send-to-device]: https://spec.matrix.org/v1.18/client-server-api/#send-to-device-messaging
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 use serde::{
-    de::{self, Unexpected},
     Deserialize, Deserializer, Serialize, Serializer,
+    de::{self, Unexpected},
 };
 
 use crate::OwnedDeviceId;

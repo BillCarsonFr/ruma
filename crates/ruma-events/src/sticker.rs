@@ -1,14 +1,14 @@
 //! Types for the [`m.sticker`] event.
 //!
-//! [`m.sticker`]: https://spec.matrix.org/latest/client-server-api/#msticker
+//! [`m.sticker`]: https://spec.matrix.org/v1.18/client-server-api/#msticker
 
 use ruma_common::OwnedMxcUri;
 use ruma_macros::EventContent;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 
 #[cfg(feature = "compat-encrypted-stickers")]
 use crate::room::EncryptedFile;
-use crate::room::{message::Relation, ImageInfo, MediaSource};
+use crate::room::{ImageInfo, MediaSource, message::Relation};
 
 /// The source of a sticker media file.
 #[derive(Clone, Debug, Serialize)]

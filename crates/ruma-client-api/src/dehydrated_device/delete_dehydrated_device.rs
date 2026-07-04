@@ -8,25 +8,26 @@ pub mod unstable {
     //! [MSC]: https://github.com/matrix-org/matrix-spec-proposals/pull/3814
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedDeviceId,
+        OwnedDeviceId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: DELETE,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             unstable => "/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
         }
-    };
+    }
 
     /// Request type for the `DELETE` `dehydrated_device` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {}
 
     /// Request type for the `DELETE` `dehydrated_device` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The unique ID of the device that was deleted.
         pub device_id: OwnedDeviceId,

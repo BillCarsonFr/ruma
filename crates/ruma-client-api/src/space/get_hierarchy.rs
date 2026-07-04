@@ -5,17 +5,18 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1roomsroomidhierarchy
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1roomsroomidhierarchy
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId,
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::space::SpaceHierarchyRoomsChunk;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -23,10 +24,10 @@ pub mod v1 {
             unstable => "/_matrix/client/unstable/org.matrix.msc2946/rooms/{room_id}/hierarchy",
             1.2 => "/_matrix/client/v1/rooms/{room_id}/hierarchy",
         }
-    };
+    }
 
     /// Request type for the `hierarchy` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room ID of the space to get a hierarchy for.
         #[ruma_api(path)]
@@ -60,7 +61,7 @@ pub mod v1 {
     }
 
     /// Response type for the `hierarchy` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// A token to supply to from to keep paginating the responses.

@@ -23,34 +23,34 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3refresh
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3refresh
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::NoAccessToken, request, response},
         metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             unstable => "/_matrix/client/unstable/org.matrix.msc2918/refresh",
             1.3 => "/_matrix/client/v3/refresh",
         }
-    };
+    }
 
     /// Request type for the `refresh` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The refresh token.
         pub refresh_token: String,
     }
 
     /// Response type for the `refresh` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The new access token to use.
         pub access_token: String,

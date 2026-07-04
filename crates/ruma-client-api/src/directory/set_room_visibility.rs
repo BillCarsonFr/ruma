@@ -5,16 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3directorylistroomroomid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3directorylistroomroomid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId,
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::room::Visibility;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
@@ -22,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/directory/list/room/{room_id}",
             1.1 => "/_matrix/client/v3/directory/list/room/{room_id}",
         }
-    };
+    }
 
     /// Request type for the `set_room_visibility` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The ID of the room of which to set the visibility.
         #[ruma_api(path)]
@@ -36,7 +37,7 @@ pub mod v3 {
     }
 
     /// Response type for the `set_room_visibility` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

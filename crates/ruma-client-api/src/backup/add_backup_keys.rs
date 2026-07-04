@@ -5,19 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3room_keyskeys
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3room_keyskeys
 
     use std::collections::BTreeMap;
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId,
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::backup::RoomKeyBackup;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: true,
         authentication: AccessToken,
@@ -25,10 +26,10 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/room_keys/keys",
             1.1 => "/_matrix/client/v3/room_keys/keys",
         }
-    };
+    }
 
     /// Request type for the `add_backup_keys` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The backup version to add keys to.
         ///
@@ -41,7 +42,7 @@ pub mod v3 {
     }
 
     /// Response type for the `add_backup_keys` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// An opaque string representing stored keys in the backup.
         ///

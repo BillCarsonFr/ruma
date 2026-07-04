@@ -5,20 +5,21 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1mediathumbnailservernamemediaid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1mediathumbnailservernamemediaid
 
     use std::time::Duration;
 
     use http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        IdParseError, MxcUri, OwnedServerName,
+        api::{auth_scheme::AccessToken, request, response},
         http_headers::ContentDisposition,
         media::Method,
-        metadata, IdParseError, MxcUri, OwnedServerName,
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -26,10 +27,10 @@ pub mod v1 {
             unstable("org.matrix.msc3916") => "/_matrix/client/unstable/org.matrix.msc3916/media/thumbnail/{server_name}/{media_id}",
             1.11 | stable("org.matrix.msc3916.stable") => "/_matrix/client/v1/media/thumbnail/{server_name}/{media_id}",
         }
-    };
+    }
 
     /// Request type for the `get_content_thumbnail` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The server name from the mxc:// URI (the authoritory component).
         #[ruma_api(path)]
@@ -79,7 +80,7 @@ pub mod v1 {
     }
 
     /// Response type for the `get_content_thumbnail` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A thumbnail of the requested content.
         #[ruma_api(raw_body)]

@@ -1,7 +1,8 @@
 use std::fmt;
 
-use js_int::{uint, UInt};
+use js_int::{UInt, uint};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use time::OffsetDateTime;
 use web_time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -22,16 +23,17 @@ impl MilliSecondsSinceUnixEpoch {
 
     /// The current system time in milliseconds since the unix epoch.
     pub fn now() -> Self {
-        #[cfg(not(all(target_family = "wasm", target_os = "unknown", feature = "js")))]
-        return Self::from_system_time(SystemTime::now()).expect("date out of range");
-
-        #[cfg(all(target_family = "wasm", target_os = "unknown", feature = "js"))]
-        return Self(f64_to_uint(js_sys::Date::now()));
+        Self::from_system_time(SystemTime::now()).expect("date out of range")
     }
 
     /// Creates a new `SystemTime` from `self`, if it can be represented.
     pub fn to_system_time(self) -> Option<SystemTime> {
         UNIX_EPOCH.checked_add(Duration::from_millis(self.0.into()))
+    }
+
+    /// Adds the given Duration to the time, returning it if the new time can be represented.
+    pub fn checked_add(self, rhs: Duration) -> Option<Self> {
+        Some(Self(self.0.checked_add(rhs.as_millis().try_into().ok()?)?))
     }
 
     /// Get the time since the unix epoch in milliseconds.
@@ -72,6 +74,22 @@ impl fmt::Debug for MilliSecondsSinceUnixEpoch {
     }
 }
 
+impl TryFrom<SystemTime> for MilliSecondsSinceUnixEpoch {
+    type Error = TimeConversionError;
+
+    fn try_from(value: SystemTime) -> Result<Self, Self::Error> {
+        Self::from_system_time(value).ok_or(TimeConversionError::SystemTime(value))
+    }
+}
+
+impl TryFrom<MilliSecondsSinceUnixEpoch> for SystemTime {
+    type Error = TimeConversionError;
+
+    fn try_from(value: MilliSecondsSinceUnixEpoch) -> Result<Self, Self::Error> {
+        value.to_system_time().ok_or(TimeConversionError::MilliSecondsSinceUnixEpoch(value))
+    }
+}
+
 /// A timestamp represented as the number of seconds since the unix epoch.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[allow(clippy::exhaustive_structs)]
@@ -89,16 +107,17 @@ impl SecondsSinceUnixEpoch {
 
     /// The current system-time as seconds since the unix epoch.
     pub fn now() -> Self {
-        #[cfg(not(all(target_family = "wasm", target_os = "unknown", feature = "js")))]
-        return Self::from_system_time(SystemTime::now()).expect("date out of range");
-
-        #[cfg(all(target_family = "wasm", target_os = "unknown", feature = "js"))]
-        return Self(f64_to_uint(js_sys::Date::now() / 1000.0));
+        Self::from_system_time(SystemTime::now()).expect("date out of range")
     }
 
     /// Creates a new `SystemTime` from `self`, if it can be represented.
     pub fn to_system_time(self) -> Option<SystemTime> {
         UNIX_EPOCH.checked_add(Duration::from_secs(self.0.into()))
+    }
+
+    /// Adds the given Duration to the time, returning it if the new time can be represented.
+    pub fn checked_add(self, rhs: Duration) -> Option<Self> {
+        Some(Self(self.0.checked_add(rhs.as_millis().try_into().ok()?)?))
     }
 
     /// Get time since the unix epoch in seconds.
@@ -132,11 +151,34 @@ impl fmt::Debug for SecondsSinceUnixEpoch {
     }
 }
 
-#[cfg(all(target_family = "wasm", target_os = "unknown", feature = "js"))]
-fn f64_to_uint(val: f64) -> UInt {
-    // UInt::MAX milliseconds is ~285 616 years, we do not account for that
-    // (or for dates before the unix epoch which would have to be negative)
-    UInt::try_from(val as u64).expect("date out of range")
+impl TryFrom<SystemTime> for SecondsSinceUnixEpoch {
+    type Error = TimeConversionError;
+
+    fn try_from(value: SystemTime) -> Result<Self, Self::Error> {
+        Self::from_system_time(value).ok_or(TimeConversionError::SystemTime(value))
+    }
+}
+
+impl TryFrom<SecondsSinceUnixEpoch> for SystemTime {
+    type Error = TimeConversionError;
+
+    fn try_from(value: SecondsSinceUnixEpoch) -> Result<Self, Self::Error> {
+        value.to_system_time().ok_or(TimeConversionError::SecondsSinceUnixEpoch(value))
+    }
+}
+
+/// The error type returned when failing to convert to or from SystemTime
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum TimeConversionError {
+    #[error("Cannot represent {0:?} as SystemTime")]
+    MilliSecondsSinceUnixEpoch(MilliSecondsSinceUnixEpoch),
+
+    #[error("Cannot represent {0:?} as SystemTime")]
+    SecondsSinceUnixEpoch(SecondsSinceUnixEpoch),
+
+    #[error("Cannot represent {0:?} as Ruma time type")]
+    SystemTime(SystemTime),
 }
 
 #[cfg(test)]

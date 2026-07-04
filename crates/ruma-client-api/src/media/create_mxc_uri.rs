@@ -5,14 +5,15 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixmediav1create
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixmediav1create
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, MilliSecondsSinceUnixEpoch, OwnedMxcUri,
+        MilliSecondsSinceUnixEpoch, OwnedMxcUri,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -20,15 +21,15 @@ pub mod v1 {
             unstable("fi.mau.msc2246") => "/_matrix/media/unstable/fi.mau.msc2246/create",
             1.7 => "/_matrix/media/v1/create",
         }
-    };
+    }
 
     /// Request type for the `create_mxc_uri` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {}
 
     /// Response type for the `create_mxc_uri` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The MXC URI for the about to be uploaded content.
         pub content_uri: OwnedMxcUri,

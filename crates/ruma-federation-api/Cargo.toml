@@ -7,30 +7,24 @@ license = "MIT"
 name = "ruma-federation-api"
 readme = "README.md"
 repository = "https://github.com/ruma/ruma"
-version = "0.12.0"
-edition = "2021"
+version = "0.15.0"
+edition = "2024"
 rust-version = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
 
 [features]
-# Allow some mandatory fields in requests / responses to be missing, defaulting
-# them to an empty string in deserialization.
-compat-empty-string-null = []
-
 # Allow the `pdus` field in a transaction request to be missing, defaulting to
 # an empty `Vec` in deserialization.
 compat-optional-txn-pdus = []
 
 client = ["dep:httparse", "dep:memchr"]
 server = ["dep:bytes", "dep:rand"]
-unstable-msc2448 = []
 unstable-msc3618 = []
 unstable-msc3723 = []
-unstable-msc3843 = []
+unstable-msc3843 = ["ruma-common/unstable-msc3843"]
 unstable-msc4125 = []
-unstable-msc4311 = []
 
 [dependencies]
 bytes = { workspace = true, optional = true }
@@ -44,6 +38,7 @@ mime = { version = "0.3.0" }
 rand = { workspace = true, optional = true }
 ruma-common = { workspace = true, features = ["api"] }
 ruma-events = { workspace = true }
+ruma-signatures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

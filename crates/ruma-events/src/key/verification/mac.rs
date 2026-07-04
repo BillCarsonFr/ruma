@@ -1,10 +1,10 @@
 //! Types for the [`m.key.verification.mac`] event.
 //!
-//! [`m.key.verification.mac`]: https://spec.matrix.org/latest/client-server-api/#mkeyverificationmac
+//! [`m.key.verification.mac`]: https://spec.matrix.org/v1.18/client-server-api/#mkeyverificationmac
 
 use std::collections::BTreeMap;
 
-use ruma_common::{serde::Base64, OwnedTransactionId};
+use ruma_common::{OwnedTransactionId, serde::Base64};
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
 

@@ -1,12 +1,24 @@
 use ruma_common::serde::StringEnum;
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use serde_json::{from_value as from_json_value, json};
 
-#[derive(Debug, PartialEq)]
-struct PrivOwnedStr(Box<str>);
+ruma_common::priv_owned_str!();
 
-#[derive(PartialEq, StringEnum)]
+#[derive(StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 enum MyEnum {
+    First,
+    Second,
+    #[ruma_enum(rename = "m.third")]
+    Third,
+    HelloWorld,
+    #[ruma_enum(rename = "io.ruma.unstable", alias = "m.stable", alias = "hs.notareal.unstable")]
+    Stable,
+    _Custom(PrivOwnedStr),
+}
+
+#[derive(StringEnum)]
+#[ruma_enum(rename_all(prefix = "unstable-", rule = "kebab-case"))]
+enum MyUnstableEnum {
     First,
     Second,
     #[ruma_enum(rename = "m.third")]
@@ -25,6 +37,13 @@ fn as_ref_str() {
     assert_eq!(MyEnum::HelloWorld.as_ref(), "hello_world");
     assert_eq!(MyEnum::Stable.as_ref(), "io.ruma.unstable");
     assert_eq!(MyEnum::_Custom(PrivOwnedStr("HelloWorld".into())).as_ref(), "HelloWorld");
+
+    assert_eq!(MyUnstableEnum::First.as_ref(), "unstable-first");
+    assert_eq!(MyUnstableEnum::Second.as_ref(), "unstable-second");
+    assert_eq!(MyUnstableEnum::Third.as_ref(), "m.third");
+    assert_eq!(MyUnstableEnum::HelloWorld.as_ref(), "unstable-hello-world");
+    assert_eq!(MyUnstableEnum::Stable.as_ref(), "io.ruma.unstable");
+    assert_eq!(MyUnstableEnum::_Custom(PrivOwnedStr("HelloWorld".into())).as_ref(), "HelloWorld");
 }
 
 #[test]
@@ -35,6 +54,16 @@ fn display() {
     assert_eq!(MyEnum::HelloWorld.to_string(), "hello_world");
     assert_eq!(MyEnum::Stable.to_string(), "io.ruma.unstable");
     assert_eq!(MyEnum::_Custom(PrivOwnedStr("HelloWorld".into())).to_string(), "HelloWorld");
+
+    assert_eq!(MyUnstableEnum::First.to_string(), "unstable-first");
+    assert_eq!(MyUnstableEnum::Second.to_string(), "unstable-second");
+    assert_eq!(MyUnstableEnum::Third.to_string(), "m.third");
+    assert_eq!(MyUnstableEnum::HelloWorld.to_string(), "unstable-hello-world");
+    assert_eq!(MyUnstableEnum::Stable.to_string(), "io.ruma.unstable");
+    assert_eq!(
+        MyUnstableEnum::_Custom(PrivOwnedStr("HelloWorld".into())).to_string(),
+        "HelloWorld"
+    );
 }
 
 #[test]
@@ -46,6 +75,16 @@ fn debug() {
     assert_eq!(format!("{:?}", MyEnum::Stable), "\"io.ruma.unstable\"");
     assert_eq!(
         format!("{:?}", MyEnum::_Custom(PrivOwnedStr("HelloWorld".into()))),
+        "\"HelloWorld\""
+    );
+
+    assert_eq!(format!("{:?}", MyUnstableEnum::First), "\"unstable-first\"");
+    assert_eq!(format!("{:?}", MyUnstableEnum::Second), "\"unstable-second\"");
+    assert_eq!(format!("{:?}", MyUnstableEnum::Third), "\"m.third\"");
+    assert_eq!(format!("{:?}", MyUnstableEnum::HelloWorld), "\"unstable-hello-world\"");
+    assert_eq!(format!("{:?}", MyUnstableEnum::Stable), "\"io.ruma.unstable\"");
+    assert_eq!(
+        format!("{:?}", MyUnstableEnum::_Custom(PrivOwnedStr("HelloWorld".into()))),
         "\"HelloWorld\""
     );
 }
@@ -60,16 +99,35 @@ fn from_string() {
     assert_eq!(MyEnum::from("m.stable"), MyEnum::Stable);
     assert_eq!(MyEnum::from("hs.notareal.unstable"), MyEnum::Stable);
     assert_eq!(MyEnum::from("HelloWorld"), MyEnum::_Custom(PrivOwnedStr("HelloWorld".into())));
+
+    assert_eq!(MyUnstableEnum::from("unstable-first"), MyUnstableEnum::First);
+    assert_eq!(MyUnstableEnum::from("unstable-second"), MyUnstableEnum::Second);
+    assert_eq!(MyUnstableEnum::from("m.third"), MyUnstableEnum::Third);
+    assert_eq!(MyUnstableEnum::from("unstable-hello-world"), MyUnstableEnum::HelloWorld);
+    assert_eq!(MyUnstableEnum::from("io.ruma.unstable"), MyUnstableEnum::Stable);
+    assert_eq!(MyUnstableEnum::from("m.stable"), MyUnstableEnum::Stable);
+    assert_eq!(MyUnstableEnum::from("hs.notareal.unstable"), MyUnstableEnum::Stable);
+    assert_eq!(
+        MyUnstableEnum::from("HelloWorld"),
+        MyUnstableEnum::_Custom(PrivOwnedStr("HelloWorld".into()))
+    );
 }
 
 #[test]
 fn serialize() {
-    assert_eq!(to_json_value(MyEnum::First).unwrap(), json!("first"));
-    assert_eq!(to_json_value(MyEnum::HelloWorld).unwrap(), json!("hello_world"));
-    assert_eq!(to_json_value(MyEnum::Stable).unwrap(), json!("io.ruma.unstable"));
-    assert_eq!(
-        to_json_value(MyEnum::_Custom(PrivOwnedStr("\\\n\\".into()))).unwrap(),
-        json!("\\\n\\")
+    use ruma_common::canonical_json::assert_to_canonical_json_eq;
+
+    assert_to_canonical_json_eq!(MyEnum::First, json!("first"));
+    assert_to_canonical_json_eq!(MyEnum::HelloWorld, json!("hello_world"));
+    assert_to_canonical_json_eq!(MyEnum::Stable, json!("io.ruma.unstable"));
+    assert_to_canonical_json_eq!(MyEnum::_Custom(PrivOwnedStr("\\\n\\".into())), json!("\\\n\\"));
+
+    assert_to_canonical_json_eq!(MyUnstableEnum::First, json!("unstable-first"));
+    assert_to_canonical_json_eq!(MyUnstableEnum::HelloWorld, json!("unstable-hello-world"));
+    assert_to_canonical_json_eq!(MyUnstableEnum::Stable, json!("io.ruma.unstable"));
+    assert_to_canonical_json_eq!(
+        MyUnstableEnum::_Custom(PrivOwnedStr("\\\n\\".into())),
+        json!("\\\n\\"),
     );
 }
 
@@ -83,5 +141,30 @@ fn deserialize() {
     assert_eq!(
         from_json_value::<MyEnum>(json!("\\\n\\")).unwrap(),
         MyEnum::_Custom(PrivOwnedStr("\\\n\\".into()))
+    );
+
+    assert_eq!(
+        from_json_value::<MyUnstableEnum>(json!("unstable-first")).unwrap(),
+        MyUnstableEnum::First
+    );
+    assert_eq!(
+        from_json_value::<MyUnstableEnum>(json!("unstable-hello-world")).unwrap(),
+        MyUnstableEnum::HelloWorld
+    );
+    assert_eq!(
+        from_json_value::<MyUnstableEnum>(json!("io.ruma.unstable")).unwrap(),
+        MyUnstableEnum::Stable
+    );
+    assert_eq!(
+        from_json_value::<MyUnstableEnum>(json!("m.stable")).unwrap(),
+        MyUnstableEnum::Stable
+    );
+    assert_eq!(
+        from_json_value::<MyUnstableEnum>(json!("hs.notareal.unstable")).unwrap(),
+        MyUnstableEnum::Stable
+    );
+    assert_eq!(
+        from_json_value::<MyUnstableEnum>(json!("\\\n\\")).unwrap(),
+        MyUnstableEnum::_Custom(PrivOwnedStr("\\\n\\".into()))
     );
 }

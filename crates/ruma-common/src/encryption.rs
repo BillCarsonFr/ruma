@@ -1,15 +1,15 @@
 //! Common types for [encryption] related tasks.
 //!
-//! [encryption]: https://spec.matrix.org/latest/client-server-api/#end-to-end-encryption
+//! [encryption]: https://spec.matrix.org/v1.18/client-server-api/#end-to-end-encryption
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    serde::{Base64, StringEnum},
     CrossSigningOrDeviceSignatures, DeviceSignatures, EventEncryptionAlgorithm,
     OwnedCrossSigningKeyId, OwnedDeviceId, OwnedDeviceKeyId, OwnedUserId, PrivOwnedStr,
+    serde::{Base64, StringEnum},
 };
 
 /// Identity keys for a device.
@@ -117,8 +117,8 @@ pub enum OneTimeKey {
 
 /// A [cross-signing] key.
 ///
-/// [cross-signing]: https://spec.matrix.org/latest/client-server-api/#cross-signing
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// [cross-signing]: https://spec.matrix.org/v1.18/client-server-api/#cross-signing
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct CrossSigningKey {
     /// The ID of the user the key belongs to.
@@ -157,7 +157,7 @@ impl CrossSigningKey {
 
 /// The usage of a cross signing key.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[ruma_enum(rename_all = "snake_case")]
 pub enum KeyUsage {

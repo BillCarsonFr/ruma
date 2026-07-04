@@ -1,22 +1,22 @@
 //! `/v3/` ([spec])
 //!
-//! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3sync
+//! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3sync
 
 use std::{collections::BTreeMap, time::Duration};
 
 use as_variant::as_variant;
 use js_int::UInt;
 use ruma_common::{
-    api::{request, response, Metadata},
+    OneTimeKeyAlgorithm, OwnedEventId, OwnedRoomId, OwnedUserId,
+    api::{auth_scheme::AccessToken, request, response},
     metadata,
     presence::PresenceState,
     serde::Raw,
-    OneTimeKeyAlgorithm, OwnedEventId, OwnedRoomId, OwnedUserId,
 };
 use ruma_events::{
-    presence::PresenceEvent, AnyGlobalAccountDataEvent, AnyRoomAccountDataEvent,
-    AnyStrippedStateEvent, AnySyncEphemeralRoomEvent, AnySyncStateEvent, AnySyncTimelineEvent,
-    AnyToDeviceEvent,
+    AnyGlobalAccountDataEvent, AnyRoomAccountDataEvent, AnyStrippedStateEvent,
+    AnySyncEphemeralRoomEvent, AnySyncStateEvent, AnySyncTimelineEvent, AnyToDeviceEvent,
+    presence::PresenceEvent,
 };
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ mod response_serde;
 use super::{DeviceLists, UnreadNotificationsCount};
 use crate::filter::FilterDefinition;
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: GET,
     rate_limited: false,
     authentication: AccessToken,
@@ -33,10 +33,10 @@ const METADATA: Metadata = metadata! {
         1.0 => "/_matrix/client/r0/sync",
         1.1 => "/_matrix/client/v3/sync",
     }
-};
+}
 
 /// Request type for the `sync` endpoint.
-#[request(error = crate::Error)]
+#[request]
 #[derive(Default)]
 pub struct Request {
     /// A filter represented either as its full JSON definition or the ID of a saved filter.
@@ -75,18 +75,13 @@ pub struct Request {
 
     /// Controls whether to receive state changes between the previous sync and the **start** of
     /// the timeline, or between the previous sync and the **end** of the timeline.
-    #[cfg(feature = "unstable-msc4222")]
-    #[serde(
-        default,
-        skip_serializing_if = "ruma_common::serde::is_default",
-        rename = "org.matrix.msc4222.use_state_after"
-    )]
+    #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
     #[ruma_api(query)]
     pub use_state_after: bool,
 }
 
 /// Response type for the `sync` endpoint.
-#[response(error = crate::Error)]
+#[response]
 pub struct Response {
     /// The batch token to supply in the `since` param of the next `/sync` request.
     pub next_batch: String,
@@ -262,7 +257,7 @@ pub struct JoinedRoom {
     /// If `unread_thread_notifications` was set to `true` in the [`RoomEventFilter`], these
     /// include only the unread notifications for the main timeline.
     ///
-    /// [unread notifications]: https://spec.matrix.org/latest/client-server-api/#receiving-notifications
+    /// [unread notifications]: https://spec.matrix.org/v1.18/client-server-api/#receiving-notifications
     /// [`RoomEventFilter`]: crate::filter::RoomEventFilter
     #[serde(skip_serializing_if = "UnreadNotificationsCount::is_empty")]
     pub unread_notifications: UnreadNotificationsCount,
@@ -273,7 +268,7 @@ pub struct JoinedRoom {
     ///
     /// Only set if `unread_thread_notifications` was set to `true` in the [`RoomEventFilter`].
     ///
-    /// [unread notifications]: https://spec.matrix.org/latest/client-server-api/#receiving-notifications
+    /// [unread notifications]: https://spec.matrix.org/v1.18/client-server-api/#receiving-notifications
     /// [`RoomEventFilter`]: crate::filter::RoomEventFilter
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub unread_thread_notifications: BTreeMap<OwnedEventId, UnreadNotificationsCount>,
@@ -422,8 +417,8 @@ pub enum State {
     /// To get the full list of state changes since the previous sync, the state events in
     /// [`Timeline`] must be added to these events to update the local state.
     ///
-    /// With the `unstable-msc4222` feature, to get this variant, `use_state_after` must be set to
-    /// `false` in the [`Request`], which is the default.
+    /// To get this variant, `use_state_after` must be set to `false` in the [`Request`], which is
+    /// the default.
     #[serde(rename = "state")]
     Before(StateEvents),
 
@@ -433,8 +428,7 @@ pub enum State {
     /// [`Timeline`] must be ignored to update the local state.
     ///
     /// To get this variant, `use_state_after` must be set to `true` in the [`Request`].
-    #[cfg(feature = "unstable-msc4222")]
-    #[serde(rename = "org.matrix.msc4222.state_after")]
+    #[serde(rename = "state_after")]
     After(StateEvents),
 }
 
@@ -448,7 +442,6 @@ impl State {
     pub fn is_empty(&self) -> bool {
         match self {
             Self::Before(state) => state.is_empty(),
-            #[cfg(feature = "unstable-msc4222")]
             Self::After(state) => state.is_empty(),
         }
     }
@@ -691,7 +684,8 @@ impl ToDevice {
 #[cfg(test)]
 mod tests {
     use assign::assign;
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::canonical_json::assert_to_canonical_json_eq;
+    use serde_json::{from_value as from_json_value, json};
 
     use super::Timeline;
 
@@ -699,13 +693,13 @@ mod tests {
     fn timeline_serde() {
         let timeline = assign!(Timeline::new(), { limited: true });
         let timeline_serialized = json!({ "events": [], "limited": true });
-        assert_eq!(to_json_value(timeline).unwrap(), timeline_serialized);
+        assert_to_canonical_json_eq!(timeline, timeline_serialized.clone());
 
         let timeline_deserialized = from_json_value::<Timeline>(timeline_serialized).unwrap();
         assert!(timeline_deserialized.limited);
 
         let timeline_default = Timeline::default();
-        assert_eq!(to_json_value(timeline_default).unwrap(), json!({ "events": [] }));
+        assert_to_canonical_json_eq!(timeline_default, json!({ "events": [] }));
 
         let timeline_default_deserialized =
             from_json_value::<Timeline>(json!({ "events": [] })).unwrap();
@@ -715,18 +709,19 @@ mod tests {
 
 #[cfg(all(test, feature = "client"))]
 mod client_tests {
-    use std::time::Duration;
+    use std::{borrow::Cow, time::Duration};
 
     use assert_matches2::assert_matches;
     use ruma_common::{
+        RoomVersionId,
         api::{
-            IncomingResponse as _, MatrixVersion, OutgoingRequest as _, SendAccessToken,
-            SupportedVersions,
+            IncomingResponse as _, MatrixVersion, OutgoingRequest as _, SupportedVersions,
+            auth_scheme::SendAccessToken,
         },
-        event_id, room_id, user_id, RoomVersionId,
+        event_id, room_id, user_id,
     };
     use ruma_events::AnyStrippedStateEvent;
-    use serde_json::{json, to_vec as to_json_vec, Value as JsonValue};
+    use serde_json::{Value as JsonValue, json, to_vec as to_json_vec};
 
     use super::{Filter, PresenceState, Request, Response, State};
 
@@ -761,13 +756,12 @@ mod client_tests {
             full_state: true,
             set_presence: PresenceState::Offline,
             timeout: Some(Duration::from_millis(30000)),
-            #[cfg(feature = "unstable-msc4222")]
             use_state_after: true,
         }
         .try_into_http_request(
             "https://homeserver.tld",
             SendAccessToken::IfRequired("auth_tok"),
-            &supported,
+            Cow::Owned(supported),
         )
         .unwrap();
 
@@ -780,8 +774,7 @@ mod client_tests {
         assert!(query.contains("full_state=true"));
         assert!(query.contains("set_presence=offline"));
         assert!(query.contains("timeout=30000"));
-        #[cfg(feature = "unstable-msc4222")]
-        assert!(query.contains("org.matrix.msc4222.use_state_after=true"));
+        assert!(query.contains("use_state_after=true"));
     }
 
     #[test]
@@ -925,7 +918,6 @@ mod client_tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable-msc4222")]
     fn deserialize_response_empty_state_after() {
         let joined_room_id = room_id!("!joined:localhost");
         let left_room_id = room_id!("!left:localhost");
@@ -935,12 +927,12 @@ mod client_tests {
             "rooms": {
                 "join": {
                     joined_room_id: {
-                        "org.matrix.msc4222.state_after": {},
+                        "state_after": {},
                     },
                 },
                 "leave": {
                     left_room_id: {
-                        "org.matrix.msc4222.state_after": {},
+                        "state_after": {},
                     },
                 },
             },
@@ -963,7 +955,6 @@ mod client_tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable-msc4222")]
     fn deserialize_response_non_empty_state_after() {
         let joined_room_id = room_id!("!joined:localhost");
         let left_room_id = room_id!("!left:localhost");
@@ -974,7 +965,7 @@ mod client_tests {
             "rooms": {
                 "join": {
                     joined_room_id: {
-                        "org.matrix.msc4222.state_after": {
+                        "state_after": {
                             "events": [
                                 event,
                             ],
@@ -983,7 +974,7 @@ mod client_tests {
                 },
                 "leave": {
                     left_room_id: {
-                        "org.matrix.msc4222.state_after": {
+                        "state_after": {
                             "events": [
                                 event,
                             ],
@@ -1022,7 +1013,7 @@ mod server_tests {
         serde::Raw,
     };
     use ruma_events::AnySyncStateEvent;
-    use serde_json::{from_slice as from_json_slice, json, Value as JsonValue};
+    use serde_json::{Value as JsonValue, from_slice as from_json_slice, json};
 
     use super::{Filter, JoinedRoom, LeftRoom, Request, Response, State};
 
@@ -1219,7 +1210,6 @@ mod server_tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable-msc4222")]
     fn serialize_response_empty_state_after() {
         let joined_room_id = owned_room_id!("!joined:localhost");
         let left_room_id = owned_room_id!("!left:localhost");
@@ -1243,12 +1233,12 @@ mod server_tests {
                 "rooms": {
                     "join": {
                         joined_room_id: {
-                            "org.matrix.msc4222.state_after": {},
+                            "state_after": {},
                         },
                     },
                     "leave": {
                         left_room_id: {
-                            "org.matrix.msc4222.state_after": {},
+                            "state_after": {},
                         },
                     },
                 },
@@ -1257,7 +1247,6 @@ mod server_tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable-msc4222")]
     fn serialize_response_non_empty_state_after() {
         let joined_room_id = owned_room_id!("!joined:localhost");
         let left_room_id = owned_room_id!("!left:localhost");
@@ -1282,7 +1271,7 @@ mod server_tests {
                 "rooms": {
                     "join": {
                         joined_room_id: {
-                            "org.matrix.msc4222.state_after": {
+                            "state_after": {
                                 "events": [
                                     event,
                                 ],
@@ -1291,7 +1280,7 @@ mod server_tests {
                     },
                     "leave": {
                         left_room_id: {
-                            "org.matrix.msc4222.state_after": {
+                            "state_after": {
                                 "events": [
                                     event,
                                 ],

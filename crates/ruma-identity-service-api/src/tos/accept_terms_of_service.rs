@@ -5,21 +5,21 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#post_matrixidentityv2terms
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#post_matrixidentityv2terms
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/terms",
         }
-    };
+    }
 
     /// Request type for the `accept_terms_of_service` endpoint.
     #[request]

@@ -12,17 +12,18 @@ use std::{collections::BTreeMap, time::Duration};
 use js_int::UInt;
 use js_option::JsOption;
 use ruma_common::{
-    api::{request, response, Metadata},
-    metadata,
-    serde::{duration::opt_ms, Raw},
     OwnedMxcUri, OwnedRoomId, OwnedUserId,
+    api::{auth_scheme::AccessToken, request, response},
+    metadata,
+    presence::PresenceState,
+    serde::{Raw, duration::opt_ms},
 };
 use ruma_events::{AnySyncStateEvent, AnySyncTimelineEvent, StateEventType};
 use serde::{Deserialize, Serialize};
 
 use super::UnreadNotificationsCount;
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: POST,
     rate_limited: false,
     authentication: AccessToken,
@@ -30,10 +31,10 @@ const METADATA: Metadata = metadata! {
         unstable("org.matrix.simplified_msc3575") => "/_matrix/client/unstable/org.matrix.simplified_msc3575/sync",
         // 1.4 => "/_matrix/client/v5/sync",
     }
-};
+}
 
 /// Request type for the `/sync` endpoint.
-#[request(error = crate::Error)]
+#[request]
 #[derive(Default)]
 pub struct Request {
     /// A point in time to continue a sync from.
@@ -70,6 +71,13 @@ pub struct Request {
     #[ruma_api(query)]
     pub timeout: Option<Duration>,
 
+    /// Controls whether the client is automatically marked as online by polling this API.
+    ///
+    /// Defaults to `PresenceState::Online`.
+    #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
+    #[ruma_api(query)]
+    pub set_presence: PresenceState,
+
     /// Lists of rooms we are interested by, represented by ranges.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub lists: BTreeMap<String, request::List>,
@@ -95,7 +103,7 @@ impl Request {
 
 /// HTTP types related to a [`Request`].
 pub mod request {
-    use ruma_common::{directory::RoomTypeFilter, serde::deserialize_cow_str, RoomId};
+    use ruma_common::{RoomId, directory::RoomTypeFilter, serde::deserialize_cow_str};
     use serde::de::Error as _;
 
     use super::{BTreeMap, Deserialize, OwnedRoomId, Serialize, StateEventType, UInt};
@@ -210,6 +218,11 @@ pub mod request {
         )]
         pub thread_subscriptions: ThreadSubscriptions,
 
+        /// Configure the profiles extension.
+        #[cfg(feature = "unstable-msc4262")]
+        #[serde(default, skip_serializing_if = "Profiles::is_empty")]
+        pub profiles: Profiles,
+
         /// Extensions may add further fields to the list.
         #[serde(flatten)]
         other: BTreeMap<String, serde_json::Value>,
@@ -218,12 +231,24 @@ pub mod request {
     impl Extensions {
         /// Whether all fields are empty or `None`.
         pub fn is_empty(&self) -> bool {
-            self.to_device.is_empty()
+            let mut empty = self.to_device.is_empty()
                 && self.e2ee.is_empty()
                 && self.account_data.is_empty()
                 && self.receipts.is_empty()
                 && self.typing.is_empty()
-                && self.other.is_empty()
+                && self.other.is_empty();
+
+            #[cfg(feature = "unstable-msc4308")]
+            {
+                empty = empty && self.thread_subscriptions.is_empty();
+            }
+
+            #[cfg(feature = "unstable-msc4262")]
+            {
+                empty = empty && self.profiles.is_empty();
+            }
+
+            empty
         }
     }
 
@@ -257,7 +282,7 @@ pub mod request {
         {
             match deserialize_cow_str(deserializer)?.as_ref() {
                 "*" => Ok(Self::AllSubscribed),
-                other => Ok(Self::Room(RoomId::parse(other).map_err(D::Error::custom)?.to_owned())),
+                other => Ok(Self::Room(RoomId::parse(other).map_err(D::Error::custom)?)),
             }
         }
     }
@@ -306,7 +331,7 @@ pub mod request {
         }
     }
 
-    /// Account-data extension .
+    /// Account-data extension.
     ///
     /// Not yet part of the spec proposal. Taken from the reference implementation
     /// <https://github.com/matrix-org/sliding-sync/blob/main/sync3/extensions/account_data.go>
@@ -437,10 +462,58 @@ pub mod request {
             self.enabled.is_none() && self.limit.is_none()
         }
     }
+
+    /// User profiles extension.
+    ///
+    /// Specified as part of [MSC4262](https://github.com/matrix-org/matrix-spec-proposals/pull/4262).
+    #[cfg(feature = "unstable-msc4262")]
+    #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+    #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    pub struct Profiles {
+        /// Activate or deactivate this extension.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub enabled: Option<bool>,
+
+        /// List of list names for which user profiles should be enabled.
+        ///
+        /// If not defined, will be enabled for *all* the lists appearing in the
+        /// request. If defined and empty, will be disabled for all the lists.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub lists: Option<Vec<String>>,
+
+        /// List of room names for which user profiles should be enabled.
+        ///
+        /// If not defined, will be enabled for *all* the rooms appearing in the
+        /// room subscriptions. If defined and empty, will be disabled for all
+        /// the rooms.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub rooms: Option<Vec<ExtensionRoomConfig>>,
+
+        /// Optional filter to control which profile fields to receive updates for. If omitted, all
+        /// profile field updates are included.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub fields: Option<Vec<ruma_common::profile::ProfileFieldName>>,
+
+        /// Optional flag to control whether the initial sync includes recent historical profile
+        /// changes:
+        ///
+        /// If false (default), only current profile states are sent on initial sync.
+        /// If true, the server may include recent profile changes that occurred before the sync.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub include_history: Option<bool>,
+    }
+
+    #[cfg(feature = "unstable-msc4262")]
+    impl Profiles {
+        /// Whether all fields are empty or `None`.
+        pub fn is_empty(&self) -> bool {
+            self.enabled.is_none()
+        }
+    }
 }
 
 /// Response type for the `/sync` endpoint.
-#[response(error = crate::Error)]
+#[response]
 pub struct Response {
     /// Matches the `txn_id` sent by the request (see [`Request::txn_id`]).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -481,9 +554,11 @@ pub mod response {
     use ruma_common::OneTimeKeyAlgorithm;
     #[cfg(feature = "unstable-msc4308")]
     use ruma_common::OwnedEventId;
+    #[cfg(feature = "unstable-msc4262")]
+    use ruma_common::profile::UserProfileUpdate;
     use ruma_events::{
-        receipt::SyncReceiptEvent, typing::SyncTypingEvent, AnyGlobalAccountDataEvent,
-        AnyRoomAccountDataEvent, AnyStrippedStateEvent, AnyToDeviceEvent,
+        AnyGlobalAccountDataEvent, AnyRoomAccountDataEvent, AnyStrippedStateEvent,
+        AnyToDeviceEvent, receipt::SyncReceiptEvent, typing::SyncTypingEvent,
     };
 
     use super::{
@@ -510,11 +585,25 @@ pub mod response {
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
     pub struct Room {
         /// The name as calculated by the server.
+        ///
+        /// If the `unstable-compat-lax-syncv5-deser` feature is enabled,
+        /// this field is ignored if its deserialization fails.
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "unstable-compat-lax-syncv5-deser",
+            serde(default, deserialize_with = "ruma_common::serde::default_on_error")
+        )]
         pub name: Option<String>,
 
         /// The avatar.
+        ///
+        /// If the `unstable-compat-lax-syncv5-deser` feature is enabled,
+        /// this field is ignored if its deserialization fails.
         #[serde(default, skip_serializing_if = "JsOption::is_undefined")]
+        #[cfg_attr(
+            feature = "unstable-compat-lax-syncv5-deser",
+            serde(deserialize_with = "ruma_common::serde::default_on_error")
+        )]
         pub avatar: JsOption<OwnedMxcUri>,
 
         /// Whether it is an initial response.
@@ -595,11 +684,25 @@ pub mod response {
         pub user_id: OwnedUserId,
 
         /// The name.
+        ///
+        /// If the `unstable-compat-lax-syncv5-deser` feature is enabled,
+        /// this field is ignored if its deserialization fails.
         #[serde(rename = "displayname", skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "unstable-compat-lax-syncv5-deser",
+            serde(default, deserialize_with = "ruma_common::serde::default_on_error")
+        )]
         pub name: Option<String>,
 
         /// The avatar.
+        ///
+        /// If the `unstable-compat-lax-syncv5-deser` feature is enabled,
+        /// this field is ignored if its deserialization fails.
         #[serde(rename = "avatar_url", skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "unstable-compat-lax-syncv5-deser",
+            serde(default, deserialize_with = "ruma_common::serde::default_on_error")
+        )]
         pub avatar: Option<OwnedMxcUri>,
     }
 
@@ -642,6 +745,11 @@ pub mod response {
             rename = "io.element.msc4308.thread_subscriptions"
         )]
         pub thread_subscriptions: ThreadSubscriptions,
+
+        /// Profiles extension response.
+        #[cfg(feature = "unstable-msc4262")]
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty", rename = "users")]
+        pub profiles: BTreeMap<OwnedUserId, UserProfileUpdate>,
     }
 
     impl Extensions {
@@ -649,11 +757,23 @@ pub mod response {
         ///
         /// True if neither to-device, e2ee nor account data are to be found.
         pub fn is_empty(&self) -> bool {
-            self.to_device.is_none()
+            let mut empty = self.to_device.is_none()
                 && self.e2ee.is_empty()
                 && self.account_data.is_empty()
                 && self.receipts.is_empty()
-                && self.typing.is_empty()
+                && self.typing.is_empty();
+
+            #[cfg(feature = "unstable-msc4308")]
+            {
+                empty = empty && self.thread_subscriptions.is_empty();
+            }
+
+            #[cfg(feature = "unstable-msc4262")]
+            {
+                empty = empty && self.profiles.is_empty();
+            }
+
+            empty
         }
     }
 
@@ -822,5 +942,38 @@ mod tests {
             serde_json::from_str::<ExtensionRoomConfig>(r#""!foo:bar.baz""#).unwrap(),
             ExtensionRoomConfig::Room(owned_room_id!("!foo:bar.baz"))
         );
+    }
+
+    #[test]
+    #[cfg(feature = "unstable-compat-lax-syncv5-deser")]
+    fn deserialize_room_ignores_invalid_string_fields() {
+        use super::response::Room;
+
+        let room: Room = serde_json::from_str(
+            r#"{
+                "name": {},
+                "avatar": {},
+                "heroes": [{ "user_id": "@alice:localhost", "displayname": {}, "avatar_url": {} }]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(room.name, None);
+        assert!(room.avatar.is_undefined());
+        let hero = &room.heroes.unwrap()[0];
+        assert_eq!(hero.name, None);
+        assert_eq!(hero.avatar, None);
+
+        // Valid values are still kept.
+        let room: Room = serde_json::from_str(
+            r#"{ "name": "Room", "avatar": "mxc://localhost/a", "heroes": [{ "user_id": "@alice:localhost", "displayname": "Alice", "avatar_url": "mxc://localhost/b" }] }"#,
+        )
+        .unwrap();
+
+        assert_eq!(room.name.as_deref(), Some("Room"));
+        assert_eq!(room.avatar.into_option().unwrap().as_str(), "mxc://localhost/a");
+        let hero = &room.heroes.unwrap()[0];
+        assert_eq!(hero.name.as_deref(), Some("Alice"));
+        assert_eq!(hero.avatar.as_ref().unwrap().as_str(), "mxc://localhost/b");
     }
 }

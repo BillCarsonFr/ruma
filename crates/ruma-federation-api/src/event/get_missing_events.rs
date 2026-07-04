@@ -5,23 +5,24 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#post_matrixfederationv1get_missing_eventsroomid
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#post_matrixfederationv1get_missing_eventsroomid
 
-    use js_int::{uint, UInt};
+    use js_int::{UInt, uint};
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedEventId, OwnedRoomId,
+        OwnedEventId, OwnedRoomId,
+        api::{request, response},
+        metadata,
     };
     use serde_json::value::RawValue as RawJsonValue;
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/get_missing_events/{room_id}",
-        }
-    };
+        path: "/_matrix/federation/v1/get_missing_events/{room_id}",
+    }
 
     /// Request type for the `get_missing_events` endpoint.
     #[request]
@@ -87,6 +88,7 @@ pub mod v1 {
         uint!(10)
     }
 
+    #[cfg(feature = "client")]
     fn is_default_limit(val: &UInt) -> bool {
         *val == default_limit()
     }

@@ -104,12 +104,15 @@
 
 #![warn(missing_docs)]
 
-use std::{collections::BTreeSet, fmt};
+#[cfg(feature = "unstable-uniffi")]
+uniffi::setup_scaffolding!();
+
+use std::collections::BTreeSet;
 
 #[cfg(feature = "unstable-msc4354")]
 use js_int::UInt;
-use ruma_common::{room_version_rules::RedactionRules, EventEncryptionAlgorithm, OwnedUserId};
-use serde::{de::IgnoredAny, Deserialize, Serialize, Serializer};
+use ruma_common::{EventEncryptionAlgorithm, OwnedUserId, room_version_rules::RedactionRules};
+use serde::{Deserialize, Serialize, Serializer, de::IgnoredAny};
 
 // Needs to be public for trybuild tests
 #[doc(hidden)]
@@ -164,7 +167,9 @@ pub mod ignored_user_list;
 pub mod image;
 #[cfg(feature = "unstable-msc2545")]
 pub mod image_pack;
+pub mod invite_permission_config;
 pub mod key;
+pub mod key_backup;
 #[cfg(feature = "unstable-msc3488")]
 pub mod location;
 pub mod marked_unread;
@@ -180,6 +185,7 @@ pub mod presence;
 pub mod push_rules;
 pub mod reaction;
 pub mod receipt;
+pub mod recent_emoji;
 pub mod relation;
 pub mod room;
 pub mod room_key;
@@ -191,7 +197,11 @@ pub mod rtc;
 pub mod secret;
 pub mod secret_storage;
 pub mod space;
+#[cfg(feature = "unstable-msc3230")]
+pub mod space_order;
 pub mod sticker;
+#[cfg(feature = "unstable-msc4471")]
+pub mod stream;
 pub mod tag;
 pub mod typing;
 #[cfg(feature = "unstable-msc3553")]
@@ -205,7 +215,10 @@ pub use self::{
     kinds::*,
     relation::{BundledMessageLikeRelations, BundledStateRelations},
     state_key::EmptyStateKey,
-    unsigned::{MessageLikeUnsigned, RedactedUnsigned, StateUnsigned, UnsignedRoomRedactionEvent},
+    unsigned::{
+        AnyRedactionEvent, MessageLikeUnsigned, RedactedUnsigned, StateUnsigned,
+        UnsignedRoomRedactionEvent,
+    },
 };
 
 /// Trait to define the behavior of redact an event's content object.
@@ -297,18 +310,7 @@ impl Mentions {
     }
 }
 
-// Wrapper around `Box<str>` that cannot be used in a meaningful way outside of
-// this crate. Used for string enums because their `_Custom` variant can't be
-// truly private (only `#[doc(hidden)]`).
-#[doc(hidden)]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PrivOwnedStr(Box<str>);
-
-impl fmt::Debug for PrivOwnedStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
+ruma_common::priv_owned_str!(uniffi);
 
 /// Sticky duration in milliseconds.
 /// Valid values are the integer range 0-3600000 (1 hour).

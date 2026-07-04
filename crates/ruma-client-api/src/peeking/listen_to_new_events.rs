@@ -5,19 +5,19 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#peeking_get_matrixclientv3events
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#peeking_get_matrixclientv3events
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedRoomId,
     };
     use ruma_events::AnyTimelineEvent;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -25,11 +25,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/events",
             1.1 => "/_matrix/client/v3/events",
         }
-    };
+    }
 
     /// Request type for the `listen_to_new_events` endpoint.
-    #[request(error = crate::Error)]
-    #[derive(Default)]
+    #[request]
     pub struct Request {
         /// The token to stream from.
         ///
@@ -39,14 +38,8 @@ pub mod v3 {
         pub from: Option<String>,
 
         /// The room ID for which events should be returned.
-        ///
-        /// This field [should be required], but the spec marks it as optional so it is an
-        /// `Option`.
-        ///
-        /// [should be required]: https://github.com/matrix-org/matrix-spec/issues/2098
         #[ruma_api(query)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub room_id: Option<OwnedRoomId>,
+        pub room_id: OwnedRoomId,
 
         /// The maximum time to wait for an event.
         #[ruma_api(query)]
@@ -61,12 +54,12 @@ pub mod v3 {
     impl Request {
         /// Creates a `Request` for the given room.
         pub fn new(room_id: OwnedRoomId) -> Self {
-            Self { room_id: Some(room_id), ..Default::default() }
+            Self { from: None, room_id, timeout: None }
         }
     }
 
     /// Response type for the `listen_to_new_events` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// An array of new events.

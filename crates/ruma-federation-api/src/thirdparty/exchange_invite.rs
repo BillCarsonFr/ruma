@@ -4,37 +4,35 @@
 //! If valid, the receiving server will issue an invite as per the [Inviting to a room] section
 //! before returning a response to this request.
 //!
-//! [Inviting to a room]: https://spec.matrix.org/latest/server-server-api/#inviting-to-a-room
+//! [Inviting to a room]: https://spec.matrix.org/v1.18/server-server-api/#inviting-to-a-room
 
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#put_matrixfederationv1exchange_third_party_inviteroomid
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#put_matrixfederationv1exchange_third_party_inviteroomid
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId, OwnedUserId,
+        api::{request, response},
         metadata,
         serde::Raw,
-        OwnedRoomId, OwnedUserId,
     };
     use ruma_events::{
+        StateEventType,
         room::{
             member::{MembershipState, RoomMemberEventContent, ThirdPartyInvite},
             third_party_invite::RoomThirdPartyInviteEventContent,
         },
-        StateEventType,
     };
 
-    use crate::thirdparty::bind_callback;
+    use crate::{authentication::ServerSignatures, thirdparty::bind_callback};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
-        authentication: AccessToken,
-        history: {
-            1.0 => "/_matrix/federation/v1/exchange_third_party_invite/{room_id}",
-        }
-    };
+        authentication: ServerSignatures,
+        path: "/_matrix/federation/v1/exchange_third_party_invite/{room_id}",
+    }
 
     /// Request type for the `exchange_invite` endpoint.
     #[request]

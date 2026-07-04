@@ -1,26 +1,34 @@
 //! Common types for rooms.
 
-use std::{borrow::Cow, collections::BTreeMap};
+use std::borrow::Cow;
 
 use as_variant::as_variant;
 use js_int::UInt;
-use serde::{de, Deserialize, Serialize};
-use serde_json::{value::RawValue as RawJsonValue, Value as JsonValue};
+use serde::{Deserialize, Serialize, de};
+use serde_json::{Value as JsonValue, value::RawValue as RawJsonValue};
 
 use crate::{
-    serde::{from_raw_json_value, StringEnum},
     EventEncryptionAlgorithm, OwnedMxcUri, OwnedRoomAliasId, OwnedRoomId, PrivOwnedStr,
     RoomVersionId,
+    serde::{JsonObject, StringEnum, from_raw_json_value},
 };
 
 /// An enum of possible room types.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[non_exhaustive]
 pub enum RoomType {
     /// Defines the room as a space.
     #[ruma_enum(rename = "m.space")]
     Space,
+
+    /// Defines the room as a call.
+    ///
+    /// This uses the unstable prefix in
+    /// [MSC3417](https://github.com/matrix-org/matrix-spec-proposals/pull/3417).
+    #[cfg(feature = "unstable-msc3417")]
+    #[ruma_enum(rename = "org.matrix.msc3417.call")]
+    Call,
 
     /// Defines the room as a custom type.
     #[doc(hidden)]
@@ -29,8 +37,9 @@ pub enum RoomType {
 
 /// The rule used for users wishing to join this room.
 ///
-/// This type can hold an arbitrary string. To check for values that are not available as a
-/// documented variant here, use its string representation, obtained through `.as_str()`.
+/// This type can hold an arbitrary join rule. To check for values that are not available as a
+/// documented variant here, get its kind with [`.kind()`](Self::kind) or its string representation
+/// with [`.as_str()`](Self::as_str), and its associated data with [`.data()`](Self::data).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[serde(tag = "join_rule", rename_all = "snake_case")]
@@ -59,8 +68,8 @@ pub enum JoinRule {
     Public,
 
     #[doc(hidden)]
-    #[serde(skip_serializing)]
-    _Custom(PrivOwnedStr),
+    #[serde(untagged)]
+    _Custom(CustomJoinRule),
 }
 
 impl JoinRule {
@@ -73,7 +82,9 @@ impl JoinRule {
             Self::Restricted(_) => JoinRuleKind::Restricted,
             Self::KnockRestricted(_) => JoinRuleKind::KnockRestricted,
             Self::Public => JoinRuleKind::Public,
-            Self::_Custom(rule) => JoinRuleKind::_Custom(rule.clone()),
+            Self::_Custom(CustomJoinRule { join_rule, .. }) => {
+                JoinRuleKind::_Custom(PrivOwnedStr(join_rule.as_str().into()))
+            }
         }
     }
 
@@ -86,7 +97,36 @@ impl JoinRule {
             JoinRule::Restricted(_) => "restricted",
             JoinRule::KnockRestricted(_) => "knock_restricted",
             JoinRule::Public => "public",
-            JoinRule::_Custom(rule) => &rule.0,
+            JoinRule::_Custom(CustomJoinRule { join_rule, .. }) => join_rule,
+        }
+    }
+
+    /// Returns the associated data of this `JoinRule`.
+    ///
+    /// The returned JSON object won't contain the `join_rule` field, use
+    /// [`.kind()`](Self::kind) or [`.as_str()`](Self::as_str) to access those.
+    ///
+    /// Prefer to use the public variants of `JoinRule` where possible; this method is meant to
+    /// be used for custom join rules only.
+    pub fn data(&self) -> Cow<'_, JsonObject> {
+        fn serialize<T: Serialize>(obj: &T) -> JsonObject {
+            match serde_json::to_value(obj).expect("join rule serialization should succeed") {
+                JsonValue::Object(mut obj) => {
+                    obj.remove("body");
+                    obj
+                }
+                _ => panic!("all message types should serialize to objects"),
+            }
+        }
+
+        match self {
+            JoinRule::Invite | JoinRule::Knock | JoinRule::Private | JoinRule::Public => {
+                Cow::Owned(JsonObject::new())
+            }
+            JoinRule::Restricted(restricted) | JoinRule::KnockRestricted(restricted) => {
+                Cow::Owned(serialize(restricted))
+            }
+            Self::_Custom(c) => Cow::Borrowed(&c.data),
         }
     }
 }
@@ -101,13 +141,10 @@ impl<'de> Deserialize<'de> for JoinRule {
         #[derive(Deserialize)]
         struct ExtractType<'a> {
             #[serde(borrow)]
-            join_rule: Option<Cow<'a, str>>,
+            join_rule: Cow<'a, str>,
         }
 
-        let join_rule = serde_json::from_str::<ExtractType<'_>>(json.get())
-            .map_err(de::Error::custom)?
-            .join_rule
-            .ok_or_else(|| de::Error::missing_field("join_rule"))?;
+        let ExtractType { join_rule } = from_raw_json_value(&json)?;
 
         match join_rule.as_ref() {
             "invite" => Ok(Self::Invite),
@@ -116,9 +153,31 @@ impl<'de> Deserialize<'de> for JoinRule {
             "restricted" => from_raw_json_value(&json).map(Self::Restricted),
             "knock_restricted" => from_raw_json_value(&json).map(Self::KnockRestricted),
             "public" => Ok(Self::Public),
-            _ => Ok(Self::_Custom(PrivOwnedStr(join_rule.into()))),
+            _ => {
+                let mut data = from_raw_json_value::<JsonObject, _>(&json)?;
+                let join_rule = as_variant!(
+                    data.remove("join_rule")
+                        .expect("we already checked that the join_rule field is present"),
+                    JsonValue::String
+                )
+                .expect("we already checked that the join rule is a string");
+
+                Ok(Self::_Custom(CustomJoinRule { join_rule, data }))
+            }
         }
     }
+}
+
+/// The payload for an unsupported join rule.
+#[doc(hidden)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct CustomJoinRule {
+    /// The kind of join rule.
+    join_rule: String,
+
+    /// The remaining data.
+    #[serde(flatten)]
+    data: JsonObject,
 }
 
 /// Configuration of the `Restricted` join rule.
@@ -146,13 +205,42 @@ pub enum AllowRule {
     RoomMembership(RoomMembership),
 
     #[doc(hidden)]
-    _Custom(Box<CustomAllowRule>),
+    _Custom(CustomAllowRule),
 }
 
 impl AllowRule {
     /// Constructs an `AllowRule` with membership of the room with the given id as its predicate.
     pub fn room_membership(room_id: OwnedRoomId) -> Self {
         Self::RoomMembership(RoomMembership::new(room_id))
+    }
+
+    /// Returns the string name of this `AllowRule`.
+    pub fn rule_type(&self) -> &str {
+        match self {
+            AllowRule::RoomMembership(_) => "m.room_membership",
+            AllowRule::_Custom(CustomAllowRule { rule_type, .. }) => rule_type,
+        }
+    }
+
+    /// Returns the associated data of this `AllowRule`.
+    ///
+    /// The returned JSON object won't contain the `type` field, use
+    /// [`Self::rule_type`] to access that.
+    ///
+    /// Prefer to use the public variants of `AllowRule` where possible; this method is meant to
+    /// be used for custom allow rules only.
+    pub fn data(&self) -> Cow<'_, JsonObject> {
+        fn serialize<T: Serialize>(obj: &T) -> JsonObject {
+            match serde_json::to_value(obj).expect("join rule serialization should succeed") {
+                JsonValue::Object(obj) => obj,
+                _ => panic!("all message types should serialize to objects"),
+            }
+        }
+
+        match self {
+            AllowRule::RoomMembership(membership) => Cow::Owned(serialize(membership)),
+            Self::_Custom(custom) => Cow::Borrowed(&custom.data),
+        }
     }
 }
 
@@ -173,13 +261,16 @@ impl RoomMembership {
 }
 
 #[doc(hidden)]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct CustomAllowRule {
+    /// The type of the allow rule.
     #[serde(rename = "type")]
     rule_type: String,
+
+    /// The remaining data.
     #[serde(flatten)]
-    extra: BTreeMap<String, JsonValue>,
+    data: JsonObject,
 }
 
 impl<'de> Deserialize<'de> for AllowRule {
@@ -193,25 +284,31 @@ impl<'de> Deserialize<'de> for AllowRule {
         #[derive(Deserialize)]
         struct ExtractType<'a> {
             #[serde(borrow, rename = "type")]
-            rule_type: Option<Cow<'a, str>>,
+            rule_type: Cow<'a, str>,
         }
 
         // Get the value of `type` if present.
-        let rule_type = serde_json::from_str::<ExtractType<'_>>(json.get())
-            .map_err(de::Error::custom)?
-            .rule_type;
+        let ExtractType { rule_type } = from_raw_json_value(&json)?;
 
-        match rule_type.as_deref() {
-            Some("m.room_membership") => from_raw_json_value(&json).map(Self::RoomMembership),
-            Some(_) => from_raw_json_value(&json).map(Self::_Custom),
-            None => Err(de::Error::missing_field("type")),
+        match rule_type.as_ref() {
+            "m.room_membership" => from_raw_json_value(&json).map(Self::RoomMembership),
+            _ => {
+                let mut data = from_raw_json_value::<JsonObject, _>(&json)?;
+                let rule_type = as_variant!(
+                    data.remove("type").expect("we already checked that the type field is present"),
+                    JsonValue::String
+                )
+                .expect("we already checked that the type is a string");
+
+                Ok(Self::_Custom(CustomAllowRule { rule_type, data }))
+            }
         }
     }
 }
 
 /// The kind of rule used for users wishing to join this room.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, Default, PartialEq, Eq, StringEnum)]
+#[derive(Clone, Default, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub enum JoinRuleKind {
@@ -405,8 +502,17 @@ impl<'de> Deserialize<'de> for RoomSummary {
 
 /// The rule used for users wishing to join a room.
 ///
-/// In contrast to the regular `JoinRule` in `ruma_events`, this enum holds only simplified
-/// conditions for joining restricted rooms.
+/// In contrast to the regular [`JoinRule`], this enum holds only simplified conditions for joining
+/// restricted rooms.
+///
+/// This type can hold an arbitrary join rule. To check for values that are not available as a
+/// documented variant here, get its kind with `.kind()` or use its string representation, obtained
+/// through `.as_str()`.
+///
+/// Because this type contains a few neighbouring fields instead of a whole object, and it is not
+/// possible to know which fields to parse for unknown variants, this type will fail to serialize if
+/// it doesn't match one of the documented variants. It is only possible to construct an
+/// undocumented variant by deserializing it, so do not re-serialize this type.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[serde(tag = "join_rule", rename_all = "snake_case")]
@@ -477,7 +583,9 @@ impl From<JoinRule> for JoinRuleSummary {
             JoinRule::Restricted(restricted) => Self::Restricted(restricted.into()),
             JoinRule::KnockRestricted(restricted) => Self::KnockRestricted(restricted.into()),
             JoinRule::Public => Self::Public,
-            JoinRule::_Custom(rule) => Self::_Custom(rule),
+            JoinRule::_Custom(CustomJoinRule { join_rule, .. }) => {
+                Self::_Custom(PrivOwnedStr(join_rule.into()))
+            }
         }
     }
 }
@@ -547,17 +655,16 @@ impl From<Restricted> for RestrictedSummary {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
-    use assert_matches2::assert_matches;
+    use assert_matches2::{assert_let, assert_matches};
     use js_int::uint;
-    use ruma_common::{owned_room_id, OwnedRoomId};
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{OwnedRoomId, owned_room_id};
+    use serde_json::{Value as JsonValue, from_value as from_json_value, json};
 
     use super::{
         AllowRule, CustomAllowRule, JoinRule, JoinRuleSummary, Restricted, RestrictedSummary,
         RoomMembership, RoomSummary,
     };
+    use crate::{assert_to_canonical_json_eq, serde::JsonObject};
 
     #[test]
     fn deserialize_summary_no_join_rule() {
@@ -643,8 +750,8 @@ mod tests {
             false,
         );
 
-        assert_eq!(
-            to_json_value(&summary).unwrap(),
+        assert_to_canonical_json_eq!(
+            summary,
             json!({
                 "room_id": "!room:localhost",
                 "num_joined_members": 5,
@@ -667,8 +774,8 @@ mod tests {
             false,
         );
 
-        assert_eq!(
-            to_json_value(&summary).unwrap(),
+        assert_to_canonical_json_eq!(
+            summary,
             json!({
                 "room_id": "!room:localhost",
                 "num_joined_members": 5,
@@ -678,6 +785,23 @@ mod tests {
                 "allowed_room_ids": ["!otherroom:localhost"],
             })
         );
+    }
+
+    #[test]
+    fn custom_join_rule_serialize_roundtrip() {
+        let json = json!({
+            "join_rule": "local.dev.unicorns",
+            "rainbows": true,
+        });
+
+        let join_rule = from_json_value::<JoinRule>(json.clone()).unwrap();
+        assert_eq!(join_rule.kind().as_str(), "local.dev.unicorns");
+        let data = &*join_rule.data();
+        assert_eq!(data.len(), 1);
+        assert_let!(Some(JsonValue::Bool(value)) = data.get("rainbows"));
+        assert!(value);
+
+        assert_to_canonical_json_eq!(join_rule, json);
     }
 
     #[test]
@@ -706,10 +830,16 @@ mod tests {
 
     #[test]
     fn roundtrip_custom_allow_rule() {
-        let json = r#"{"type":"org.msc9000.something","foo":"bar"}"#;
-        let allow_rule: AllowRule = serde_json::from_str(json).unwrap();
-        assert_matches!(&allow_rule, AllowRule::_Custom(_));
-        assert_eq!(serde_json::to_string(&allow_rule).unwrap(), json);
+        let json = json!({ "type": "org.msc9000.something", "foo": "bar"});
+
+        let allow_rule: AllowRule = from_json_value(json.clone()).unwrap();
+        assert_eq!(allow_rule.rule_type(), "org.msc9000.something");
+        let data = &*allow_rule.data();
+        assert_eq!(data.len(), 1);
+        assert_let!(Some(JsonValue::String(value)) = data.get("foo"));
+        assert_eq!(value, "bar");
+
+        assert_to_canonical_json_eq!(allow_rule, json);
     }
 
     #[test]
@@ -747,13 +877,13 @@ mod tests {
             restricted.allow,
             &[
                 AllowRule::room_membership(owned_room_id!("!mods:example.org")),
-                AllowRule::_Custom(Box::new(CustomAllowRule {
+                AllowRule::_Custom(CustomAllowRule {
                     rule_type: "org.example.custom".into(),
-                    extra: BTreeMap::from([(
-                        "org.example.minimum_role".into(),
+                    data: JsonObject::from_iter([(
+                        "org.example.minimum_role".to_owned(),
                         "developer".into()
-                    )])
-                }))
+                    )]),
+                })
             ]
         );
     }

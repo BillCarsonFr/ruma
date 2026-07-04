@@ -6,19 +6,18 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
-use js_int::{int, Int};
+use js_int::{Int, int};
 use ruma_common::{
+    OwnedUserId, UserId,
     room_version_rules::AuthorizationRules,
     serde::{
+        DebugAsRefStr, DisplayAsRefStr, EqAsRefStr, JsonObject, OrdAsRefStr,
         btreemap_deserialize_v1_powerlevel_values, deserialize_v1_powerlevel, from_raw_json_value,
-        DebugAsRefStr, DisplayAsRefStr, JsonObject, OrdAsRefStr, PartialEqAsRefStr,
-        PartialOrdAsRefStr,
     },
-    OwnedUserId, UserId,
 };
-use ruma_events::{room::power_levels::UserPowerLevel, TimelineEventType};
+use ruma_events::{TimelineEventType, room::power_levels::UserPowerLevel};
 use serde::de::DeserializeOwned;
-use serde_json::{from_value as from_json_value, Error};
+use serde_json::{Error, from_value as from_json_value};
 
 use super::Event;
 
@@ -328,16 +327,7 @@ impl<E: Event> RoomPowerLevelsEventOptionExt for Option<RoomPowerLevelsEvent<E>>
 }
 
 /// Fields in the `content` of an `m.room.power_levels` event with an integer value.
-#[derive(
-    DebugAsRefStr,
-    Clone,
-    Copy,
-    DisplayAsRefStr,
-    PartialEqAsRefStr,
-    Eq,
-    PartialOrdAsRefStr,
-    OrdAsRefStr,
-)]
+#[derive(DebugAsRefStr, Clone, Copy, DisplayAsRefStr, EqAsRefStr, OrdAsRefStr)]
 #[non_exhaustive]
 pub enum RoomPowerLevelsIntField {
     /// `users_default`

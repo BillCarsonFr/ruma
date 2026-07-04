@@ -5,21 +5,22 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#get_matrixfederationv1querydirectory
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#get_matrixfederationv1querydirectory
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomAliasId, OwnedRoomId, OwnedServerName,
+        OwnedRoomAliasId, OwnedRoomId, OwnedServerName,
+        api::{request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/query/directory",
-        }
-    };
+        path: "/_matrix/federation/v1/query/directory",
+    }
 
     /// Request type for the `get_room_information` endpoint.
     #[request]

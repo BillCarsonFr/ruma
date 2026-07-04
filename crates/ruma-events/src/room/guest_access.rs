@@ -1,6 +1,6 @@
 //! Types for the [`m.room.guest_access`] event.
 //!
-//! [`m.room.guest_access`]: https://spec.matrix.org/latest/client-server-api/#mroomguest_access
+//! [`m.room.guest_access`]: https://spec.matrix.org/v1.18/client-server-api/#mroomguest_access
 
 use ruma_common::serde::StringEnum;
 use ruma_macros::EventContent;
@@ -51,7 +51,7 @@ impl SyncRoomGuestAccessEvent {
 
 /// A policy for guest user access to a room.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum GuestAccess {

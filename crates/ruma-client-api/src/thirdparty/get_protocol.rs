@@ -5,15 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3thirdpartyprotocolprotocol
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3thirdpartyprotocolprotocol
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         thirdparty::Protocol,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -21,10 +21,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/thirdparty/protocol/{protocol}",
             1.1 => "/_matrix/client/v3/thirdparty/protocol/{protocol}",
         }
-    };
+    }
 
     /// Request type for the `get_protocol` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The name of the protocol.
         #[ruma_api(path)]
@@ -32,7 +32,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_protocol` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// Metadata about the protocol.
         #[ruma_api(body)]

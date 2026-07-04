@@ -5,16 +5,17 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/application-service-api/#post_matrixclientv1appserviceappserviceidping
+    //! [spec]: https://spec.matrix.org/v1.18/application-service-api/#post_matrixclientv1appserviceappserviceidping
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedTransactionId,
+        OwnedTransactionId,
+        api::{auth_scheme::AppserviceToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AppserviceToken,
@@ -22,10 +23,10 @@ pub mod v1 {
             unstable("fi.mau.msc2659") => "/_matrix/client/unstable/fi.mau.msc2659/appservice/{appservice_id}/ping",
             1.7 | stable("fi.mau.msc2659.stable") => "/_matrix/client/v1/appservice/{appservice_id}/ping",
         }
-    };
+    }
 
     /// Request type for the `request_ping` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The appservice ID of the appservice to ping.
         ///
@@ -40,7 +41,7 @@ pub mod v1 {
     }
 
     /// Response type for the `request_ping` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The duration in milliseconds that the `POST /_matrix/app/v1/ping` request took from the
         /// homeserver's point of view.

@@ -5,22 +5,23 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#get_matrixfederationv1eventeventid
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#get_matrixfederationv1eventeventid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedServerName,
+        MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedServerName,
+        api::{request, response},
+        metadata,
     };
     use serde_json::value::RawValue as RawJsonValue;
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/event/{event_id}",
-        }
-    };
+        path: "/_matrix/federation/v1/event/{event_id}",
+    }
 
     /// Request type for the `get_event` endpoint.
     #[request]

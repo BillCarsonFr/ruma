@@ -5,18 +5,18 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3presenceuseridstatus
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3presenceuseridstatus
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         presence::PresenceState,
-        OwnedUserId,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -24,10 +24,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/presence/{user_id}/status",
             1.1 => "/_matrix/client/v3/presence/{user_id}/status",
         }
-    };
+    }
 
     /// Request type for the `get_presence` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The user whose presence state will be retrieved.
         #[ruma_api(path)]
@@ -35,7 +35,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_presence` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The state message for this user if one was set.
         #[serde(skip_serializing_if = "Option::is_none")]

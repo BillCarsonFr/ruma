@@ -1,13 +1,13 @@
 //! Types describing [relationships between events].
 //!
-//! [relationships between events]: https://spec.matrix.org/latest/client-server-api/#forming-relationships-between-events
+//! [relationships between events]: https://spec.matrix.org/v1.18/client-server-api/#forming-relationships-between-events
 
 use std::fmt::Debug;
 
 use js_int::UInt;
 use ruma_common::{
-    serde::{JsonObject, Raw, StringEnum},
     OwnedEventId,
+    serde::{JsonObject, Raw, StringEnum},
 };
 use serde::{Deserialize, Serialize};
 
@@ -15,9 +15,32 @@ use crate::{AnySyncMessageLikeEvent, PrivOwnedStr};
 
 mod rel_serde;
 
+/// A [rich reply] to an event.
+///
+/// [rich reply]: https://spec.matrix.org/v1.18/client-server-api/#rich-replies
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct Reply {
+    /// The event being replied to.
+    #[serde(rename = "m.in_reply_to")]
+    pub in_reply_to: InReplyTo,
+}
+
+impl Reply {
+    /// Creates a new `Reply` with the given reply information.
+    pub fn new(in_reply_to: InReplyTo) -> Self {
+        Self { in_reply_to }
+    }
+
+    /// Creates a new `Reply` with the given event ID.
+    pub fn with_event_id(event_id: OwnedEventId) -> Self {
+        Self { in_reply_to: InReplyTo::new(event_id) }
+    }
+}
+
 /// Information about the event a [rich reply] is replying to.
 ///
-/// [rich reply]: https://spec.matrix.org/latest/client-server-api/#rich-replies
+/// [rich reply]: https://spec.matrix.org/v1.18/client-server-api/#rich-replies
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct InReplyTo {
@@ -34,7 +57,7 @@ impl InReplyTo {
 
 /// An [annotation] for an event.
 ///
-/// [annotation]: https://spec.matrix.org/latest/client-server-api/#event-annotations-and-reactions
+/// [annotation]: https://spec.matrix.org/v1.18/client-server-api/#event-annotations-and-reactions
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[serde(tag = "rel_type", rename = "m.annotation")]
@@ -60,7 +83,7 @@ impl Annotation {
 
 /// The content of a [replacement] relation.
 ///
-/// [replacement]: https://spec.matrix.org/latest/client-server-api/#event-replacements
+/// [replacement]: https://spec.matrix.org/v1.18/client-server-api/#event-replacements
 #[derive(Clone, Debug)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct Replacement<C> {
@@ -80,7 +103,7 @@ impl<C> Replacement<C> {
 
 /// The content of a [thread] relation.
 ///
-/// [thread]: https://spec.matrix.org/latest/client-server-api/#threading
+/// [thread]: https://spec.matrix.org/v1.18/client-server-api/#threading
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[serde(tag = "rel_type", rename = "m.thread")]
@@ -156,7 +179,7 @@ impl BundledThread {
 
 /// A [reference] to another event.
 ///
-/// [reference]: https://spec.matrix.org/latest/client-server-api/#reference-relations
+/// [reference]: https://spec.matrix.org/v1.18/client-server-api/#reference-relations
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[serde(tag = "rel_type", rename = "m.reference")]
@@ -204,7 +227,7 @@ impl ReferenceChunk {
 
 /// [Bundled aggregations] of related child events of a message-like event.
 ///
-/// [Bundled aggregations]: https://spec.matrix.org/latest/client-server-api/#aggregations-of-child-events
+/// [Bundled aggregations]: https://spec.matrix.org/v1.18/client-server-api/#aggregations-of-child-events
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct BundledMessageLikeRelations<E> {
@@ -265,7 +288,7 @@ impl<E> Default for BundledMessageLikeRelations<E> {
 
 /// [Bundled aggregations] of related child events of a state event.
 ///
-/// [Bundled aggregations]: https://spec.matrix.org/latest/client-server-api/#aggregations-of-child-events
+/// [Bundled aggregations]: https://spec.matrix.org/v1.18/client-server-api/#aggregations-of-child-events
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct BundledStateRelations {
@@ -292,8 +315,8 @@ impl BundledStateRelations {
 
 /// Relation types as defined in `rel_type` of an `m.relates_to` field.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
-#[ruma_enum(rename_all = "m.snake_case")]
+#[derive(Clone, StringEnum)]
+#[ruma_enum(rename_all(prefix = "m.", rule = "snake_case"))]
 #[non_exhaustive]
 pub enum RelationType {
     /// `m.annotation`, an annotation, principally used by reactions.
@@ -315,7 +338,7 @@ pub enum RelationType {
 
 /// The payload for a custom relation.
 #[doc(hidden)]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(transparent)]
 pub struct CustomRelation(pub(super) JsonObject);
 

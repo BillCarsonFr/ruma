@@ -1,7 +1,9 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-pub fn expand_partial_eq_as_ref_str(ident: &Ident) -> syn::Result<TokenStream> {
+/// Generate the `std::cmp::PartialEq` and `std::cmp::Eq` implementations for the type with the
+/// given ident, using its `AsRef<str>` implementation.
+pub fn expand_eq_as_ref_str(ident: &Ident) -> syn::Result<TokenStream> {
     Ok(quote! {
         #[automatically_derived]
         #[allow(deprecated)]
@@ -11,5 +13,9 @@ pub fn expand_partial_eq_as_ref_str(ident: &Ident) -> syn::Result<TokenStream> {
                 ::std::convert::AsRef::<::std::primitive::str>::as_ref(self) == other
             }
         }
+
+        #[automatically_derived]
+        #[allow(deprecated)]
+        impl ::std::cmp::Eq for #ident {}
     })
 }

@@ -5,26 +5,27 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3accountpasswordmsisdnrequesttoken
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3accountpasswordmsisdnrequesttoken
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedClientSecret, OwnedSessionId,
+        OwnedClientSecret, OwnedSessionId,
+        api::{auth_scheme::NoAccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/account/password/msisdn/requestToken",
             1.1 => "/_matrix/client/v3/account/password/msisdn/requestToken",
         }
-    };
+    }
 
     /// Request type for the `request_password_change_token_via_msisdn` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// Client-generated secret string used to protect this session.
         pub client_secret: OwnedClientSecret,
@@ -44,7 +45,7 @@ pub mod v3 {
     }
 
     /// Response type for the `request_password_change_token_via_msisdn` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The session identifier given by the identity server.
         pub sid: OwnedSessionId,

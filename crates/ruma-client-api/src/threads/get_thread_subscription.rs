@@ -8,21 +8,22 @@ pub mod unstable {
     //! [spec]: https://github.com/matrix-org/matrix-spec-proposals/pull/4306
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedEventId, OwnedRoomId,
+        OwnedEventId, OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
         history: {
             unstable("org.matrix.msc4306") => "/_matrix/client/unstable/io.element.msc4306/rooms/{room_id}/thread/{thread_root}/subscription",
         }
-    };
+    }
 
     /// Request type for the `get_thread_subscription` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room ID where the thread is located.
         #[ruma_api(path)]
@@ -34,7 +35,7 @@ pub mod unstable {
     }
 
     /// Response type for the `get_thread_subscription` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// Whether the subscription was made automatically by a client, not by manual user choice.
         pub automatic: bool,

@@ -1,16 +1,17 @@
 //! Types for the [`m.room_key.withheld`] event.
 //!
-//! [`m.room_key.withheld`]: https://spec.matrix.org/latest/client-server-api/#mroom_keywithheld
+//! [`m.room_key.withheld`]: https://spec.matrix.org/v1.18/client-server-api/#mroom_keywithheld
 
 use std::borrow::Cow;
 
+use as_variant::as_variant;
 use ruma_common::{
-    serde::{from_raw_json_value, Base64, JsonObject},
     EventEncryptionAlgorithm, OwnedRoomId,
+    serde::{Base64, JsonObject, from_raw_json_value},
 };
 use ruma_macros::{EventContent, StringEnum};
-use serde::{de, Deserialize, Serialize};
-use serde_json::value::RawValue as RawJsonValue;
+use serde::{Deserialize, Serialize, de};
+use serde_json::{Value as JsonValue, value::RawValue as RawJsonValue};
 
 use crate::PrivOwnedStr;
 
@@ -18,7 +19,7 @@ use crate::PrivOwnedStr;
 ///
 /// Typically encrypted as an `m.room.encrypted` event, then sent as a to-device event.
 ///
-/// [`m.room_key.withheld`]: https://spec.matrix.org/latest/client-server-api/#mroom_keywithheld
+/// [`m.room_key.withheld`]: https://spec.matrix.org/v1.18/client-server-api/#mroom_keywithheld
 #[derive(Clone, Debug, Serialize, EventContent)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[ruma_event(type = "m.room_key.withheld", kind = ToDevice)]
@@ -154,7 +155,24 @@ impl<'de> Deserialize<'de> for RoomKeyWithheldCodeInfo {
             "m.unauthorised" => Self::Unauthorized(from_raw_json_value(&json)?),
             "m.unavailable" => Self::Unavailable(from_raw_json_value(&json)?),
             "m.no_olm" => Self::NoOlm,
-            _ => Self::_Custom(from_raw_json_value(&json)?),
+            _ => {
+                let mut data = from_raw_json_value::<JsonObject, _>(&json)?;
+
+                // Probably due to the `#[serde(flatten)]` attribute, we deserialize fields that
+                // should be caught by `ToDeviceRoomKeyWithheldEventContent`. Let's remove them to
+                // fix re-serialization.
+                data.remove("algorithm");
+                data.remove("sender_key");
+                data.remove("reason");
+
+                let code = as_variant!(
+                    data.remove("code").expect("we already checked that the code field is present"),
+                    JsonValue::String
+                )
+                .expect("we already checked that the code is a string");
+
+                Self::_Custom(CustomRoomKeyWithheldCodeInfo { code, data }.into())
+            }
         })
     }
 }
@@ -179,7 +197,7 @@ impl RoomKeyWithheldSessionData {
 
 /// The payload for a custom room key withheld code.
 #[doc(hidden)]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CustomRoomKeyWithheldCodeInfo {
     /// A custom code.
     code: String,
@@ -191,8 +209,8 @@ pub struct CustomRoomKeyWithheldCodeInfo {
 
 /// The possible codes for why a megolm key was not sent.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
-#[ruma_enum(rename_all = "m.snake_case")]
+#[derive(Clone, StringEnum)]
+#[ruma_enum(rename_all(prefix = "m.", rule = "snake_case"))]
 #[non_exhaustive]
 pub enum RoomKeyWithheldCode {
     /// `m.blacklisted`
@@ -231,8 +249,11 @@ pub enum RoomKeyWithheldCode {
 #[cfg(test)]
 mod tests {
     use assert_matches2::assert_matches;
-    use ruma_common::{owned_room_id, serde::Base64, EventEncryptionAlgorithm};
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{
+        EventEncryptionAlgorithm, canonical_json::assert_to_canonical_json_eq, owned_room_id,
+        serde::Base64,
+    };
+    use serde_json::{from_value as from_json_value, json};
 
     use super::{
         RoomKeyWithheldCodeInfo, RoomKeyWithheldSessionData, ToDeviceRoomKeyWithheldEventContent,
@@ -249,8 +270,8 @@ mod tests {
             Base64::new(PUBLIC_KEY.to_owned()),
         );
 
-        assert_eq!(
-            to_json_value(content).unwrap(),
+        assert_to_canonical_json_eq!(
+            content,
             json!({
                 "algorithm": "m.megolm.v1.aes-sha2",
                 "code": "m.no_olm",
@@ -270,8 +291,8 @@ mod tests {
             Base64::new(PUBLIC_KEY.to_owned()),
         );
 
-        assert_eq!(
-            to_json_value(content).unwrap(),
+        assert_to_canonical_json_eq!(
+            content,
             json!({
                 "algorithm": "m.megolm.v1.aes-sha2",
                 "code": "m.blacklisted",
@@ -332,6 +353,6 @@ mod tests {
         let content = from_json_value::<ToDeviceRoomKeyWithheldEventContent>(json.clone()).unwrap();
         assert_eq!(content.code.code().as_str(), "dev.ruma.custom_code");
 
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(content, json);
     }
 }

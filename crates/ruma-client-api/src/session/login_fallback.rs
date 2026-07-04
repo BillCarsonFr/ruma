@@ -2,24 +2,23 @@
 //!
 //! Get login fallback web page.
 //!
-//! [spec]: https://spec.matrix.org/latest/client-server-api/#login-fallback
+//! [spec]: https://spec.matrix.org/v1.18/client-server-api/#login-fallback
 
 use ruma_common::{
-    api::{request, Metadata},
-    metadata, OwnedDeviceId,
+    OwnedDeviceId,
+    api::{auth_scheme::NoAccessToken, request},
+    metadata,
 };
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: GET,
     rate_limited: false,
-    authentication: None,
-    history: {
-        1.0 => "/_matrix/static/client/login/",
-    }
-};
+    authentication: NoAccessToken,
+    path: "/_matrix/static/client/login/",
+}
 
 /// Request type for the `login_fallback` endpoint.
-#[request(error = crate::Error)]
+#[request]
 #[derive(Default)]
 pub struct Request {
     /// ID of the client device.
@@ -74,12 +73,12 @@ impl ruma_common::api::OutgoingResponse for Response {
 
 #[cfg(feature = "client")]
 impl ruma_common::api::IncomingResponse for Response {
-    type EndpointError = crate::Error;
+    type EndpointError = ruma_common::api::error::Error;
 
     fn try_from_http_response<T: AsRef<[u8]>>(
         response: http::Response<T>,
     ) -> Result<Self, ruma_common::api::error::FromHttpResponseError<Self::EndpointError>> {
-        use ruma_common::api::{error::FromHttpResponseError, EndpointError};
+        use ruma_common::api::{EndpointError, error::FromHttpResponseError};
 
         if response.status().as_u16() >= 400 {
             return Err(FromHttpResponseError::Server(Self::EndpointError::from_http_response(

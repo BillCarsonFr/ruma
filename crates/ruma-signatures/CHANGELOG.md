@@ -1,6 +1,87 @@
-# [unreleased]
+# Changelog
 
-# 0.18.0
+## Unreleased
+
+Improvements:
+
+- Add `verify_policy_server_signature()` as a helper method to check the signature of the policy
+  server that is configured in the state of the room.
+
+## 0.21.0
+
+Breaking changes:
+
+- Refactor the variants of `JsonError`: `InvalidType` and `JsonFieldMissingFromObject` were merged
+  into a single `Field` variant that uses the `CanonicalJsonFieldError` enum from `ruma-common`.
+
+Improvements:
+
+- The two steps of `hash_and_sign_event()` are now available as separate functions:
+  `add_content_hash_to_event()` and `sign_event()`. This is to help servers that need to add extra
+  signatures on an already hashed and signed event, like policy servers.
+
+## 0.20.0
+
+Breaking changes:
+
+- Refactor and improve the variants of `JsonError`:
+  - `NotOfType` and `NotMultiplesOfType` were merged into a single `InvalidType`
+    variant and provide more details about the invalid field.
+  - `JsonFieldMissingFromObject` was renamed to `MissingField` an provides the
+    full path of the missing field.
+- The methods on `Ed25519KeyPair` use a separate error enum named
+  `Ed25519KeyPairParseError`.
+  - `Error::DerParse` is now `Ed25519KeyPairParseError::Pkcs8`.
+  - `ParseError::DerivedPublicKeyDoesNotMatchParsedKey` is now
+    `Ed25519KeyPairParseError::PublicKeyMismatch`.
+  - `ParseError::Oid` is now `Ed25519KeyPairParseError::InvalidOid`.
+  - `ParseError::SecretKey` is now `Ed25519KeyPairParseError::InvalidSecretKey`.
+- The error variants returned specifically when verifying an ed25519 signature
+  use a separate error enum named `Ed25519VerificationError`, which is exposed
+  as `VerificationError::Ed25519`.
+  - `ParseError::PublicKey` is now
+    `Ed25519VerificationError::InvalidPublicKey`.
+  - `ParseError::Signature` is now
+    `Ed25519VerificationError::InvalidSignatureLength`.
+  - `VerificationError::Signature` is now
+    `Ed25519VerificationError::SignatureVerification`.
+- `Error::PduSize` is now `JsonError::PduTooLarge` allowing the following
+  functions to return `JsonError` as an error type:
+  - `to_canonical_json_string_for_signing()`
+  - `reference_hash()`
+  - `content_hash()`
+  - `sign_json()`
+  - `hash_and_sign_event()`
+- The remaining variants of `Error` and `ParseError` were merged into
+  `VerificationError`. This is now the error type returned by:
+  - `verify_canonical_json_bytes()`
+  - `verify_event()`
+  - `verify_json()`
+- When verifying the signatures on a JSON object, signatures of keys that are
+  not in the key map are ignored rather than returning an error. The
+  `VerificationError::PublicKeyNotFound` variant was removed.
+- `Ed25519KeyPair` was moved under the new `ed25519` module with its error
+  types.
+- `Signature::new()` takes an `OwnedSigningKeyId<AnyKeyName>` and a `Vec<u8>`
+  and is now infallible.
+- `canonical_json()` was renamed to `to_canonical_json_string_for_signing()` to
+  clarify that is is not to be used outside of the signing/verifying context.
+- Update `Ed25519KeyPair::generate` to return bytes directly, not a `Result`
+  - The previous implementation should have never returned an `Err` anyways
+
+Improvements:
+
+- Get a better error message when verifying a signature with a public key that
+  has the wrong length.
+- Make `required_server_signatures_to_verify_event()` public, for homeservers to
+  get the list of servers whose public keys they need to provide to
+  `verify_event()`.
+
+## 0.19.0
+
+No changes for this version
+
+## 0.18.0
 
 Breaking changes:
 
@@ -26,14 +107,14 @@ Improvements:
 - Add `verify_canonical_json_bytes()` as a low-level function to check the
   signature of canonical JSON bytes.
 
-# 0.17.1
+## 0.17.1
 
 Bug fixes:
 
 - Do not check the signature of the server of the sender of `m.room.member`
   invite events with a `third_party_invite` field.
 
-# 0.17.0
+## 0.17.0
 
 Improvements:
 
@@ -43,15 +124,15 @@ Improvements:
   variable, or inside `.cargo/config.toml`. It can also be enabled by setting
   the `RUMA_UNSTABLE_EXHAUSTIVE_TYPES` environment variable.
 
-# 0.16.0
+## 0.16.0
 
 Upgrade `ruma-common` to 0.14.0.
 
-# 0.15.0
+## 0.15.0
 
 No changes for this version
 
-# 0.14.0
+## 0.14.0
 
 Breaking changes:
 
@@ -67,86 +148,86 @@ Improvements:
 
 - Remove `age_ts` from `REFERENCE_HASH_FIELDS_TO_REMOVE` according to a spec clarification
 
-# 0.13.1
+## 0.13.1
 
 No changes for this version
 
-# 0.13.0
+## 0.13.0
 
 No changes for this version
 
-# 0.12.0
+## 0.12.0
 
 Breaking changes:
 
-* Remove pointless `PartialEq` implementation for `Ed25519Verifier`
+- Remove pointless `PartialEq` implementation for `Ed25519Verifier`
 
-# 0.11.0
-
-Breaking changes:
-
-* Upgrade dependencies
-
-# 0.10.0
+## 0.11.0
 
 Breaking changes:
 
-* Merge `SplitError` into `Error`
-* Update some function signatures to use the new `Base64` type
+- Upgrade dependencies
+
+## 0.10.0
+
+Breaking changes:
+
+- Merge `SplitError` into `Error`
+- Update some function signatures to use the new `Base64` type
 
 Improvements:
 
-* Move Room Version 9 keys out of `unstable-pre-spec` in `allowed_content_keys_for`
+- Move Room Version 9 keys out of `unstable-pre-spec` in `allowed_content_keys_for`
 
-# 0.9.0
+## 0.9.0
 
 Breaking changes:
 
-* Change a few functions to return `Result`s
-  * See each function's documentation for how it can fail
+- Change a few functions to return `Result`s
+  - See each function's documentation for how it can fail
 
 Bug fixes:
 
-* Don't check stringified JSON size <= 65535 bytes for verify_json and sign_json
+- Don't check stringified JSON size <= 65535 bytes for verify_json and sign_json
   since these functions may be used for things other than PDUs
 
-# 0.8.0
+## 0.8.0
 
 Breaking changes:
 
-* Replace `ring` dependency with `ed25519-dalek` and `pkcs8`
-* `canonical_json` and `content_hash` now return `Error` when JSON is not canonical
+- Replace `ring` dependency with `ed25519-dalek` and `pkcs8`
+- `canonical_json` and `content_hash` now return `Error` when JSON is not canonical
 
-# 0.7.2
+## 0.7.2
 
 Improvements:
 
-* Add a `compat` feature
+- Add a `compat` feature
 
   When enabled, ruma-signatures will accept slightly malformed base64 input.
 
-# 0.7.1
+## 0.7.1
 
 Improvements:
 
-* Fix verify_json signature check algorithm
-* Bump dependency versions
+- Fix verify_json signature check algorithm
+- Bump dependency versions
 
-# 0.7.0
-
-Breaking changes:
-
-* Upgrade ruma-identifiers dependency to 0.19.0
-
-# 0.6.0
+## 0.7.0
 
 Breaking changes:
 
-* Remove `Copy` implementation for `Algorithm`
-* Remove `Copy` and `Clone` implementations for `Ed25519Verifier`
-* Upgrade ruma-identifiers
+- Upgrade ruma-identifiers dependency to 0.19.0
+
+## 0.6.0
+
+Breaking changes:
+
+- Remove `Copy` implementation for `Algorithm`
+- Remove `Copy` and `Clone` implementations for `Ed25519Verifier`
+- Upgrade ruma-identifiers
 
 Bug fixes:
 
-* Verify only the required signatures on `verify_event`
-* Fix redactions for aliases events
+- Verify only the required signatures on `verify_event`
+- Fix redactions for aliases events

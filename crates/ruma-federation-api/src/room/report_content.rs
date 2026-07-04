@@ -8,18 +8,19 @@ pub mod msc3843 {
     //! [MSC]: https://github.com/matrix-org/matrix-spec-proposals/pull/3843
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedEventId, OwnedRoomId,
+        OwnedEventId, OwnedRoomId,
+        api::{request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            unstable => "/_matrix/federation/unstable/org.matrix.msc3843/rooms/{room_id}/report/{event_id}",
-        }
-    };
+        path: "/_matrix/federation/unstable/org.matrix.msc3843/rooms/{room_id}/report/{event_id}",
+    }
 
     /// Request type for the `report_content` endpoint.
     #[request]

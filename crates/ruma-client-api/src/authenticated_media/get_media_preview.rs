@@ -5,16 +5,17 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1mediapreview_url
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1mediapreview_url
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, MilliSecondsSinceUnixEpoch,
+        MilliSecondsSinceUnixEpoch,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
     use serde::Serialize;
-    use serde_json::value::{to_raw_value as to_raw_json_value, RawValue as RawJsonValue};
+    use serde_json::value::{RawValue as RawJsonValue, to_raw_value as to_raw_json_value};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -22,10 +23,10 @@ pub mod v1 {
             unstable("org.matrix.msc3916") => "/_matrix/client/unstable/org.matrix.msc3916/media/preview_url",
             1.11 | stable("org.matrix.msc3916.stable") => "/_matrix/client/v1/media/preview_url",
         }
-    };
+    }
 
     /// Request type for the `get_media_preview` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// URL to get a preview of.
         #[ruma_api(query)]
@@ -38,7 +39,7 @@ pub mod v1 {
     }
 
     /// Response type for the `get_media_preview` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// OpenGraph-like data for the URL.
@@ -80,7 +81,7 @@ pub mod v1 {
         use assert_matches2::assert_matches;
         use serde_json::{
             from_value as from_json_value, json,
-            value::{to_raw_value as to_raw_json_value, RawValue as RawJsonValue},
+            value::{RawValue as RawJsonValue, to_raw_value as to_raw_json_value},
         };
 
         // Since BTreeMap<String, Box<RawJsonValue>> deserialization doesn't seem to

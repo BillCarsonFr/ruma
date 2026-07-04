@@ -1,16 +1,19 @@
 //! `Deserialize` implementation for RoomMessageEventContent and MessageType.
 
-use ruma_common::serde::from_raw_json_value;
-use serde::{de, Deserialize};
-use serde_json::value::RawValue as RawJsonValue;
+use as_variant::as_variant;
+use ruma_common::serde::{JsonObject, from_raw_json_value};
+use serde::{Deserialize, de};
+use serde_json::{Value as JsonValue, value::RawValue as RawJsonValue};
 
 #[cfg(feature = "unstable-msc4274")]
-use super::gallery::GalleryItemType;
+use super::gallery::{CustomGalleryItemContent, GalleryItemType};
 use super::{
-    relation_serde::deserialize_relation, MessageType, RoomMessageEventContent,
-    RoomMessageEventContentWithoutRelation,
+    MessageType, RoomMessageEventContent, RoomMessageEventContentWithoutRelation,
+    relation_serde::deserialize_relation,
 };
-use crate::Mentions;
+#[cfg(feature = "unstable-msc4471")]
+use crate::stream::StreamDescriptor;
+use crate::{Mentions, room::message::CustomMessageContent};
 
 impl<'de> Deserialize<'de> for RoomMessageEventContent {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -22,9 +25,19 @@ impl<'de> Deserialize<'de> for RoomMessageEventContent {
         let mut deserializer = serde_json::Deserializer::from_str(json.get());
         let relates_to = deserialize_relation(&mut deserializer).map_err(de::Error::custom)?;
 
-        let MentionsDeHelper { mentions } = from_raw_json_value(&json)?;
+        let MentionsDeHelper {
+            mentions,
+            #[cfg(feature = "unstable-msc4471")]
+            stream,
+        } = from_raw_json_value(&json)?;
 
-        Ok(Self { msgtype: from_raw_json_value(&json)?, relates_to, mentions })
+        Ok(Self {
+            msgtype: from_raw_json_value(&json)?,
+            relates_to,
+            mentions,
+            #[cfg(feature = "unstable-msc4471")]
+            stream,
+        })
     }
 }
 
@@ -35,9 +48,18 @@ impl<'de> Deserialize<'de> for RoomMessageEventContentWithoutRelation {
     {
         let json = Box::<RawJsonValue>::deserialize(deserializer)?;
 
-        let MentionsDeHelper { mentions } = from_raw_json_value(&json)?;
+        let MentionsDeHelper {
+            mentions,
+            #[cfg(feature = "unstable-msc4471")]
+            stream,
+        } = from_raw_json_value(&json)?;
 
-        Ok(Self { msgtype: from_raw_json_value(&json)?, mentions })
+        Ok(Self {
+            msgtype: from_raw_json_value(&json)?,
+            mentions,
+            #[cfg(feature = "unstable-msc4471")]
+            stream,
+        })
     }
 }
 
@@ -45,6 +67,10 @@ impl<'de> Deserialize<'de> for RoomMessageEventContentWithoutRelation {
 struct MentionsDeHelper {
     #[serde(rename = "m.mentions")]
     mentions: Option<Mentions>,
+
+    #[cfg(feature = "unstable-msc4471")]
+    #[serde(rename = "org.matrix.msc4471.stream")]
+    stream: Option<StreamDescriptor>,
 }
 
 /// Helper struct to determine the msgtype from a `serde_json::value::RawValue`
@@ -75,7 +101,16 @@ impl<'de> Deserialize<'de> for MessageType {
             "m.text" => Self::Text(from_raw_json_value(&json)?),
             "m.video" => Self::Video(from_raw_json_value(&json)?),
             "m.key.verification.request" => Self::VerificationRequest(from_raw_json_value(&json)?),
-            _ => Self::_Custom(from_raw_json_value(&json)?),
+            _ => {
+                let mut data = from_raw_json_value::<JsonObject, _>(&json)?;
+                data.remove("msgtype");
+                let body = data
+                    .remove("body")
+                    .and_then(|value| as_variant!(value, JsonValue::String))
+                    .ok_or_else(|| de::Error::missing_field("body"))?;
+
+                Self::_Custom(CustomMessageContent { msgtype, body, data })
+            }
         })
     }
 }
@@ -102,7 +137,16 @@ impl<'de> Deserialize<'de> for GalleryItemType {
             "m.file" => Self::File(from_raw_json_value(&json)?),
             "m.image" => Self::Image(from_raw_json_value(&json)?),
             "m.video" => Self::Video(from_raw_json_value(&json)?),
-            _ => Self::_Custom(from_raw_json_value(&json)?),
+            _ => {
+                let mut data = from_raw_json_value::<JsonObject, _>(&json)?;
+                data.remove("itemtype");
+                let body = data
+                    .remove("body")
+                    .and_then(|value| as_variant!(value, JsonValue::String))
+                    .ok_or_else(|| de::Error::missing_field("body"))?;
+
+                Self::_Custom(CustomGalleryItemContent { itemtype, body, data })
+            }
         })
     }
 }
@@ -121,7 +165,6 @@ pub(in super::super) mod msc3488 {
 
     /// Deserialize helper type for `LocationMessageEventContent` with unstable fields from msc3488.
     #[derive(Serialize, Deserialize)]
-    #[serde(tag = "msgtype", rename = "m.location")]
     pub(in super::super) struct LocationMessageEventContentSerDeHelper {
         pub body: String,
 

@@ -5,16 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3publicrooms
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3publicrooms
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedServerName,
+        api::{auth_scheme::AccessToken, request, response},
         directory::{Filter, PublicRoomsChunk, RoomNetwork},
-        metadata, OwnedServerName,
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
@@ -22,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/publicRooms",
             1.1 => "/_matrix/client/v3/publicRooms",
         }
-    };
+    }
 
     /// Request type for the `get_public_rooms_filtered` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {
         /// The server to fetch the public room lists from.
@@ -53,7 +54,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_public_rooms_filtered` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// A paginated chunk of public rooms.

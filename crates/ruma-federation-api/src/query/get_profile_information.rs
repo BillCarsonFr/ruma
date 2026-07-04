@@ -5,25 +5,26 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#get_matrixfederationv1queryprofile
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#get_matrixfederationv1queryprofile
+
+    use std::collections::btree_map;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedUserId,
+        api::{request, response},
         metadata,
-        serde::StringEnum,
-        OwnedMxcUri, OwnedUserId,
+        profile::{ProfileFieldName, ProfileFieldValue, StaticProfileField, UserProfile},
     };
+    use serde_json::Value as JsonValue;
 
-    use crate::PrivOwnedStr;
+    use crate::authentication::ServerSignatures;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/query/profile",
-        }
-    };
+        path: "/_matrix/federation/v1/query/profile",
+    }
 
     /// Request type for the `get_profile_information` endpoint.
     #[request]
@@ -35,35 +36,7 @@ pub mod v1 {
         /// Profile field to query.
         #[serde(skip_serializing_if = "Option::is_none")]
         #[ruma_api(query)]
-        pub field: Option<ProfileField>,
-    }
-
-    /// Response type for the `get_profile_information` endpoint.
-    #[response]
-    #[derive(Default)]
-    pub struct Response {
-        /// Display name of the user.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub displayname: Option<String>,
-
-        /// Avatar URL for the user's avatar.
-        ///
-        /// If you activate the `compat-empty-string-null` feature, this field being an empty
-        /// string in JSON will result in `None` here during deserialization.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[cfg_attr(
-            feature = "compat-empty-string-null",
-            serde(default, deserialize_with = "ruma_common::serde::empty_string_as_none")
-        )]
-        pub avatar_url: Option<OwnedMxcUri>,
-
-        /// The [BlurHash](https://blurha.sh) for the avatar pointed to by `avatar_url`.
-        ///
-        /// This uses the unstable prefix in
-        /// [MSC2448](https://github.com/matrix-org/matrix-spec-proposals/pull/2448).
-        #[cfg(feature = "unstable-msc2448")]
-        #[serde(rename = "xyz.amorgan.blurhash", skip_serializing_if = "Option::is_none")]
-        pub blurhash: Option<String>,
+        pub field: Option<ProfileFieldName>,
     }
 
     impl Request {
@@ -73,31 +46,96 @@ pub mod v1 {
         }
     }
 
+    /// Response type for the `get_profile_information` endpoint.
+    #[response]
+    #[derive(Default)]
+    pub struct Response {
+        /// The profile data.
+        #[ruma_api(body)]
+        pub data: UserProfile,
+    }
+
     impl Response {
-        /// Creates an empty `Response`.
+        /// Creates a new empty `Response`.
         pub fn new() -> Self {
-            Default::default()
+            Self::default()
+        }
+
+        /// Returns the value of the given profile field.
+        pub fn get(&self, field: &str) -> Option<&JsonValue> {
+            self.data.get(field)
+        }
+
+        /// Returns the value of the given [`StaticProfileField`].
+        ///
+        /// Returns `Ok(Some(_))` if the field is present and the value was deserialized
+        /// successfully, `Ok(None)` if the field is not set, or an error if deserialization of the
+        /// value failed.
+        pub fn get_static<F: StaticProfileField>(
+            &self,
+        ) -> Result<Option<F::Value>, serde_json::Error> {
+            self.data.get_static::<F>()
+        }
+
+        /// Gets an iterator over the fields of the profile.
+        pub fn iter(&self) -> btree_map::Iter<'_, String, JsonValue> {
+            self.data.iter()
+        }
+
+        /// Sets a field to the given value.
+        pub fn set(&mut self, field: String, value: JsonValue) {
+            self.data.set(field, value);
         }
     }
 
-    /// Profile fields to specify in query.
-    ///
-    /// This type can hold an arbitrary string. To build this with a custom value, convert it from a
-    /// string with `::from()` / `.into()`. To check for values that are not available as a
-    /// documented variant here, use its string representation, obtained through
-    /// [`.as_str()`](Self::as_str()).
-    #[derive(Clone, PartialEq, Eq, StringEnum)]
-    #[non_exhaustive]
-    pub enum ProfileField {
-        /// Display name of the user.
-        #[ruma_enum(rename = "displayname")]
-        DisplayName,
+    impl From<UserProfile> for Response {
+        fn from(value: UserProfile) -> Self {
+            Self { data: value }
+        }
+    }
 
-        /// Avatar URL for the user's avatar.
-        #[ruma_enum(rename = "avatar_url")]
-        AvatarUrl,
+    impl FromIterator<(String, JsonValue)> for Response {
+        fn from_iter<T: IntoIterator<Item = (String, JsonValue)>>(iter: T) -> Self {
+            Self { data: UserProfile::from_iter(iter) }
+        }
+    }
 
-        #[doc(hidden)]
-        _Custom(PrivOwnedStr),
+    impl FromIterator<(ProfileFieldName, JsonValue)> for Response {
+        fn from_iter<T: IntoIterator<Item = (ProfileFieldName, JsonValue)>>(iter: T) -> Self {
+            Self { data: UserProfile::from_iter(iter) }
+        }
+    }
+
+    impl FromIterator<ProfileFieldValue> for Response {
+        fn from_iter<T: IntoIterator<Item = ProfileFieldValue>>(iter: T) -> Self {
+            Self { data: UserProfile::from_iter(iter) }
+        }
+    }
+
+    impl Extend<(String, JsonValue)> for Response {
+        fn extend<T: IntoIterator<Item = (String, JsonValue)>>(&mut self, iter: T) {
+            self.data.extend(iter);
+        }
+    }
+
+    impl Extend<(ProfileFieldName, JsonValue)> for Response {
+        fn extend<T: IntoIterator<Item = (ProfileFieldName, JsonValue)>>(&mut self, iter: T) {
+            self.data.extend(iter);
+        }
+    }
+
+    impl Extend<ProfileFieldValue> for Response {
+        fn extend<T: IntoIterator<Item = ProfileFieldValue>>(&mut self, iter: T) {
+            self.data.extend(iter);
+        }
+    }
+
+    impl IntoIterator for Response {
+        type Item = (String, JsonValue);
+        type IntoIter = btree_map::IntoIter<String, JsonValue>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.data.into_iter()
+        }
     }
 }

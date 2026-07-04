@@ -5,22 +5,22 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomidinitialsync
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3roomsroomidinitialsync
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedRoomId,
     };
     use ruma_events::{
-        room::member::MembershipState, AnyRoomAccountDataEvent, AnyStateEvent, AnyTimelineEvent,
+        AnyRoomAccountDataEvent, AnyStateEvent, AnyTimelineEvent, room::member::MembershipState,
     };
     use serde::{Deserialize, Serialize};
 
     use crate::room::Visibility;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -28,10 +28,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/initialSync",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/initialSync",
         }
-    };
+    }
 
     /// Request type for the `get_current_state` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to get the data of.
         #[ruma_api(path)]
@@ -46,7 +46,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_current_state` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The private data that this user has attached to this room.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]

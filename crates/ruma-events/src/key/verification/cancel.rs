@@ -1,12 +1,12 @@
 //! Types for the [`m.key.verification.cancel`] event.
 //!
-//! [`m.key.verification.cancel`]: https://spec.matrix.org/latest/client-server-api/#mkeyverificationcancel
+//! [`m.key.verification.cancel`]: https://spec.matrix.org/v1.18/client-server-api/#mkeyverificationcancel
 
-use ruma_common::{serde::StringEnum, OwnedTransactionId};
+use ruma_common::{OwnedTransactionId, serde::StringEnum};
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
 
-use crate::{relation::Reference, PrivOwnedStr};
+use crate::{PrivOwnedStr, relation::Reference};
 
 /// The content of a to-device `m.key.verification.cancel` event.
 ///
@@ -66,8 +66,8 @@ impl KeyVerificationCancelEventContent {
 ///
 /// Custom error codes should use the Java package naming convention.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
-#[ruma_enum(rename_all = "m.snake_case")]
+#[derive(Clone, StringEnum)]
+#[ruma_enum(rename_all(prefix = "m.", rule = "snake_case"))]
 #[non_exhaustive]
 pub enum CancelCode {
     /// The user cancelled the verification.
@@ -118,18 +118,19 @@ pub enum CancelCode {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::canonical_json::assert_to_canonical_json_eq;
+    use serde_json::{from_value as from_json_value, json};
 
     use super::CancelCode;
 
     #[test]
     fn cancel_codes_serialize_to_display_form() {
-        assert_eq!(to_json_value(&CancelCode::User).unwrap(), json!("m.user"));
+        assert_to_canonical_json_eq!(CancelCode::User, json!("m.user"));
     }
 
     #[test]
     fn custom_cancel_codes_serialize_to_display_form() {
-        assert_eq!(to_json_value(CancelCode::from("io.ruma.test")).unwrap(), json!("io.ruma.test"));
+        assert_to_canonical_json_eq!(CancelCode::from("io.ruma.test"), json!("io.ruma.test"));
     }
 
     #[test]

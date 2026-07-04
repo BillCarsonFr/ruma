@@ -6,28 +6,26 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#post_matrixkeyv2query
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#post_matrixkeyv2query
 
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        MilliSecondsSinceUnixEpoch, OwnedServerName, OwnedServerSigningKeyId,
+        api::{auth_scheme::NoAuthentication, request, response},
         metadata,
         serde::Raw,
-        MilliSecondsSinceUnixEpoch, OwnedServerName, OwnedServerSigningKeyId,
     };
     use serde::{Deserialize, Serialize};
 
     use crate::discovery::ServerSigningKeys;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
-        authentication: None,
-        history: {
-            1.0 => "/_matrix/key/v2/query",
-        }
-    };
+        authentication: NoAuthentication,
+        path: "/_matrix/key/v2/query",
+    }
 
     /// Request type for the `get_remote_server_keys_batch` endpoint.
     #[request]

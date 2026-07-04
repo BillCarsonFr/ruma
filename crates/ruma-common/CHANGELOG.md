@@ -1,13 +1,233 @@
-# [unreleased]
+# Changelog
+
+## Unreleased
+
+Bug fixes:
+
+- Add `StatusProfileField::new()` and `CallProfileField::new()` constructors for MSC4426
 
 Improvements:
 
+- Add `From` conversions between `MatrixToUri` and `MatrixUri`.
+- Extract a common `UserProfile` type out of `ruma_client_api::profile::get_profile`.
+- Add `M_CONCURRENT_WRITE` error code, used by [MSC4438].
+- Add `canonical_json::RedactingSerializer` to serialize a `CanonicalJsonObject`
+  while redacting it on the fly.
+
+[MSC4438]: https://github.com/matrix-org/matrix-spec-proposals/pull/4438
+
+## 0.19.0
+
+Bug fixes:
+
+- Properly check the room type filter in `ruma_common::directory::Filter`'s `is_empty` function.
+
+Breaking changes:
+
+- `RedactionError` was renamed to `CanonicalJsonFieldError` and its `MissingField` variant was
+  renamed to `Missing`.
+
+Improvements:
+
+- The `IdDst` macro generates `Borrow<str>` implementations for the borrowed and
+  owned identifier structs.
+- Add `CanonicalJsonObjectExt` as a helper trait to extract fields from a `CanonicalJsonObject`.
+- Implement `TryFrom` trait and `checked_add` method for working with
+  `MilliSecondsSinceUnixEpoch` and rust time types.
+- Add support for MSC4426 (User Status Profile Fields).
+
+## 0.18.0
+
+Breaking changes:
+
+- The variants of `CanonicalJsonError` variants changed.
+- `to_canonical_value()` has stricter rules, it now returns errors for the
+  following cases which were never documented to work in the first place:
+  - Serializing bytes.
+  - Serializing booleans and integers as keys for an object.
+  - Serializing the same key twice in an object.
+- The `canonical-json` feature was removed. The `canonical_json` module is no
+  longer gated behind a cargo feature.
+- The `IdDst` macro doesn't generate methods and trait implementations anymore
+  for `Box{id}`, `Arc<id>` and `Rc<{id}>`. Using `Owned{id}` should be
+  preferred.
+- `EventId::new()` was renamed to `EventId::new_v1()`, since it works only for
+  the first format of event IDs.
+- The `NoAuthentication` authentication scheme doesn't take a `SendAccessToken`
+  as input anymore, because it doesn't make sense to be able to send access
+  tokens for APIs that don't use them as a form of authentication. The new
+  `NoAccessToken` authentication scheme should be used instead for APIs that
+  rely on access tokens as a form of authentication.
+- It is no longer possible to construct custom `Action` types directly through
+  the hidden `_Custom` variant. They should be constructed with `Action::new()`
+  and their data should be accessed with `Action::data()`.
+- The `Tweak` type uses stronger enum types for its variants, and the `Custom`
+  variant is now hidden and cannot be constructed directly. It should be
+  constructed with `Tweak::new()` and its data should be accessed with
+  `Tweak::set_tweak()` and `Tweak::value()`.
+- The struct variants of `PushCondition` are now tuple variants containing a
+  non-exhaustive struct.
+- `JsonType` was renamed to `CanonicalJsonType` to reflect that it only
+  represents the possible types of a `CanonicalJsonValue`. It can also be
+  accessed with `CanonicalJsonValue::json_type()`.
+- Refactor and improve the variants of `RedactionError`:
+  - `NotOfType` was renamed to `InvalidType` and provides more details about the
+    invalid field.
+  - `JsonFieldMissingFromObject` was renamed to `MissingField` an provides the
+    full path of the missing field.
+- `redact_content_in_place()` is now infallible.
+- `MatrixError` and `MatrixErrorBody` were renamed to `Error` and `ErrorBody`
+  respectively. The `Matrix` prefix is redundant in a crate about the Matrix
+  protocol.
+- The `error` module from `ruma-client-api` was merged into the `api::error`
+  module. `Error` is now non-exhaustive and `ErrorBody` has a new `Standard`
+  variant.
+
+Improvements:
+
+- Add `canonical_json::Serializer`, which allows to serialize a type directly to
+  a `CanonicalJsonValue`, with stricter rules than
+  `serde_json::value::Serializer`. This serializer is also used in
+  `to_canonical_value()`.
+- Add the `assert_to_canonical_json_eq!` macro that can be used in tests to
+  check the canonical JSON serialization of a type against its expected value.
+- Add crate-internal `into_raw()` / `from_raw()` helpers for `IdDst` owned IDs
+  and use them in `OwnedRoomId` / `OwnedRoomAliasId` <-> `OwnedRoomOrAliasId`
+  conversions.
+- Use raw ownership transfer for conversions from `OwnedDeviceId` and
+  `OwnedBase64PublicKey` to `OwnedBase64PublicKeyOrDeviceId`.
+- Identifier types implement `(Try)From<Box<str>>`, `(Try)From<Cow<'a, str>>`
+  and `PartialEq<Cow<'a, str>>` and conversions between owned types try not to
+  reallocate when possible.
+- Add `EventId::new_v2_or_v3()` to construct event IDs formats which are based
+  on the event reference hash.
+- Add `RoomType::Call` & `RoomTypeFilter::Call` to support MSC3417 behind
+  `unstable-msc3417`
+- It is now possible to use `Base64::parse` when the inner `B` "bytes" type is
+  an array, and the inner bytes can be accessed without consuming the wrapper
+  type with `Base64::as_inner()`.
+- Add `MatrixVersion::V1_18`.
+- `CanonicalJsonValue::json_type()` allows to get the `JsonType` of a value.
+- Add `FeatureFlag::Msc4323`, the unstable feature flag for the user suspension
+  and locking endpoints, according to MSC4323.
+- Add unstable support for MSC4406.
+- Add `rule_type()` and `data()` methods to `AllowRule`.
+- Implement `PartialEq` and `Eq` on `CrossSigningKey` and `Signatures`.
+- Add `Error::is_endpoint_not_implemented()` helper method to check if it
+  matches the expected format for endpoints that are not implemented by the
+  homeserver.
+
+## 0.17.1
+
+Bug fixes:
+
+- Fix the `Clone` implementation of the `Owned*` types generated with the
+  `IdDst` macro. It used to always create a new instance from the borrowed type
+  instead of using the `Clone` implementation of the internal type.
+
+Improvements:
+
+- Add `AppserviceUserIdentity::maybe_add_to_uri()` to add an identity
+  assertion to an `http::Uri`. This allows to reimplement the behavior of
+  `OutgoingRequestAppserviceExt::try_into_http_request_with_identity()` outside
+  of Ruma, if using this trait is inconvenient.
+- Add `MatrixVersion::V1_17`.
+- `JoinRule` holds arbitrary data in its fallback variant, with can be accessed
+  with `JoinRule::data()`. It also means that this type won't fail to serialize
+  for undocumented variants anymore.
+
+## 0.17.0
+
+Breaking changes:
+
+- Merge the `PartialOrdAsRefStr` derive macro into `OrdAsRefStr`, so both traits
+  are always implemented using the same logic.
+- Rename the `PartialEqAsRefStr` derive macro to `EqAsRefStr` and make it
+  implement both `PartialEq` and `Eq`.
+- The `StringEnum` derive macro also implements `Ord`, `PartialOrd`, `Eq` and
+  `PartialEq` using the `AsRef<str>` implementation of the enum.
+- The predefined push rules for legacy mentions
+  `PatternedPushRule::contains_user_name()`,
+  `ConditionalPushRule::contains_display_name()` and
+  `ConditionalPushRule::roomnotif()` were removed, according to MSC4210.
+  Their rule IDs are still available in `PredefinedContentRuleId` and
+  `PredefinedOverrideRuleId`, and they are still supported in
+  `PatternedPushRule::applies_to()` and `ConditionalPushRule::applies()`, for
+  backwards-compatibility for clients.
+- Macros no longer support importing the `ruma` and `ruma-events` crate from the
+  `matrix-sdk-appservice` crate. This crate was dropped 2 years ago.
+- `Metadata` was changed from a `struct` to a `trait`. It is a supertrait of
+  `OutgoingRequest` and `IncomingRequest`, and its fields are now associated
+  types or constants.
+  - The `authentication` field of the `Metadata` struct is now an associated
+    type named `Authentication`. The `AuthScheme` enum was changed from an
+    `enum` to a `trait`. Its variants are now structs implementing the
+    `AuthScheme` trait. The `None` variant was renamed to `NoAuthentication` and
+    the `ServerSignatures` variant was moved to ruma-federation-api.
+    The `access_token` argument of `OutgoingRequest::try_into_http_request()` is
+    renamed to `authentication_input` and is generic over the `Input` associated
+    type of the `AuthScheme` trait.
+  - The `history` field of the `Metadata` struct is now an associated constant
+    named `PATH_BUILDER`. The type of this constant is defined by the
+    `PathBuilder` associated type, which must implement the `PathBuilder` trait.
+    The `considering` argument of `OutgoingRequest::try_into_http_request()` is
+    renamed to `path_builder_input` and is generic over the `Input` associated
+    type of the `PathBuilder` trait. The `Input` of `VersionHistory` was changed
+    from `&'_ SupportedVersions` to `Cow<'_, SupportedVersions>`.
+  - The other fields of the `Metadata` struct are now associated constants with
+    the same name converted to uppercase.
+  - The `metadata!` macro generates the `Metadata` trait implementation for a
+    type named `Request` by default. This type can be changed with an `@for`
+    setting.
+- The `http_headers` module is now behind the `api` cargo feature.
+- `OutgoingRequestAppserviceExt::try_into_http_request_with_user_id()` is
+  renamed to `try_into_http_request_with_identity()` and takes an
+  `AppserviceUserIdentity` instead of a `UserId`. This allows to specify a
+  device ID, according to MSC4326.
+- `IntoHttpError::NeedsAuthentication` is a newtype variant renamed to
+  `Authentication` that accepts any error type.
+- Remove support for the following rules for the `StringEnum`, `AsRefStr` and
+  `FromString` derive macros' `rename_all` attribute, because they either can be
+  replaced by the `(prefix = "prefix", rule = "rule")` syntax or are unused as
+  far as we know:
+  - `"PascalCase"`
+  - `"SCREAMING-KEBAB-CASE"`
+  - `"m.dotted.case"`
+  - `"M_MATRIX_ERROR_CASE"`
+  - `"m.lowercase"`
+  - `"m.snake_case"`
+  - `".m.rule.snake_case"`
+  - `"m.role.snake_case"`
+
+Bug fixes:
+
+- With the `request` and `response` attribute macros, the `Content-Type` header
+  defaults to `application/octet-stream` instead of `application/json` if the
+  `raw_body` attribute is set on a field.
+- Fix the check to make sure that all paths used to build `VersionHistory`
+  contain the same number of variables. It was broken since the syntax was
+  changed from `:variable` to `{variable}`.
+
+Improvements:
+
+- Add `org.matrix.msc4380` unstable feature support to `/versions`.
 - Add `MatrixVersion::V1_16`
 - Remove support for the `org.matrix.hydra.11` room version and the
   corresponding `unstable-hydra` cargo feature. It should only have been used
   for development, and room version 12 should be used instead.
+- `Metadata::make_endpoint_url()` is also available as `VersionHistory::make_endpoint_url()`.
+- `PushCondition::ContainsDisplayName` is deprecated, according to MSC4210.
+- Add `SinglePath` as a `PathBuilder`. It should be used for APIs that don't
+  have a `/versions` endpoint and for endpoints that can't be versioned.
+- `AuthScheme` data can be extracted from incoming HTTP requests with
+  `AuthScheme::extract_authentication()`.
+- The `StringEnum`, `AsRefStr` and `FromString` derive macros allow to set a
+  custom prefix alongside the rule to rename all the variants, like this:
+  `#[ruma_enum(rename_all(prefix = "m.", rule = "snake_case"))]`. The previous
+  syntax using `#[ruma_enum(rename_all = "snake_case")]` still works and assumes
+  that the prefix is empty.
 
-# 0.16.0
+## 0.16.0
 
 Breaking changes:
 
@@ -146,7 +366,7 @@ Improvements:
   indicate whether the room ID is required for `m.room.create` events and whether the
   event ID of the `m.room.create` is allowed in the `auth_events`, respectively.
 
-# 0.15.4
+## 0.15.4
 
 Bug fix:
 
@@ -155,7 +375,7 @@ Bug fix:
   `serde_json::from_(str/slice)`. It now works with all 3 methods but is limited
   to deserializing JSON.
 
-# 0.15.3
+## 0.15.3
 
 Improvements:
 
@@ -171,7 +391,7 @@ Improvements:
 - Add `SupportedVersions`, a type to parse `/versions` responses to get lists
   of supported versions and features.
 
-# 0.15.2
+## 0.15.2
 
 Bug fixes:
 
@@ -191,13 +411,13 @@ Improvements:
   invalid items should be ignored.
 - Add `MatrixVersion::V1_14`.
 
-# 0.15.1
+## 0.15.1
 
 Improvements:
 
 - Add `MatrixVersion::V1_13`.
 
-# 0.15.0
+## 0.15.0
 
 Breaking changes:
 
@@ -220,14 +440,14 @@ Improvements:
   - The `default_payload` field that was behind the `unstable-unspecified`
     cargo feature was removed. It can be added manually to the custom data.
 
-# 0.14.1
+## 0.14.1
 
 Bug fixes:
 
 - The `KeyId::key_name` method now returns the key name. In 0.14.0, `key_name`
   mistakenly returned the algorithm.
 
-# 0.14.0
+## 0.14.0
 
 Bug fixes:
 
@@ -277,7 +497,7 @@ Improvements:
 
 - Add the `InvalidHeaderValue` variant to the `DeserializationError` struct, for
   cases where we receive a HTTP header with an unexpected value.
-- Implement `Eq`/`Hash`/`PartialEq` for `ThirdPartyIdentifier`, to check whether 
+- Implement `Eq`/`Hash`/`PartialEq` for `ThirdPartyIdentifier`, to check whether
   a `ThirdPartyIdentifier` has already been added by another user.
 - Add `MatrixVersion::V1_11` and `MatrixVersion::V1_12`.
 - Clarify in the docs of `AuthScheme` that sending an access token via a query
@@ -297,7 +517,7 @@ Improvements:
   - Add `(owned_)base_64_public_key` to construct a compile-time validated
     `(Owned)Base64PublicKey`.
 
-# 0.13.0
+## 0.13.0
 
 Bug fixes:
 
@@ -328,13 +548,13 @@ Improvements:
 - Implement `kind()` for `push::Predefined{*}RuleId`
 - Implement `Clone` for `MatrixToUri` and `MatrixUri`
 
-# 0.12.1
+## 0.12.1
 
 Bug fixes:
 
 - Allow to deserialize `(New)ConditionalPushRule` with a missing `conditions` field.
 
-# 0.12.0
+## 0.12.0
 
 Bug fixes:
 
@@ -369,7 +589,7 @@ Improvements:
   - Adapt the redaction algorithm in `canonical_json`
 - Add unstable support for suppress edits push rule (MSC3958)
 
-# 0.11.3
+## 0.11.3
 
 Bug fixes:
 
@@ -378,11 +598,11 @@ Bug fixes:
 
 Improvements:
 
-* Add `MatrixVersion::V1_6`
-* Stabilize support for fixed base64 for SAS verification (MSC3783 / Matrix 1.6)
-  * Deprecate `MessageAuthenticationCode::HkdfHmacSha256`
+- Add `MatrixVersion::V1_6`
+- Stabilize support for fixed base64 for SAS verification (MSC3783 / Matrix 1.6)
+  - Deprecate `MessageAuthenticationCode::HkdfHmacSha256`
 
-# 0.11.2
+## 0.11.2
 
 Bug fixes:
 
@@ -396,164 +616,164 @@ Improvements:
   aliases under the same visibility as the input type (this fixes a future-
   compatibility warning when deriving `EventContent` on a non-`pub` type)
 
-# 0.11.1
+## 0.11.1
 
 Improvements:
 
 - Make alternate Debug representation of `MilliSecondsSinceUnixEpoch` and
   `SecondsSinceUnixEpoch` more compact (remove newlines)
 
-# 0.11.0
+## 0.11.0
 
 Bug fixes:
 
-* HTML-relevant characters (`<`, `>`, etc) in plaintext replies are now escaped
+- HTML-relevant characters (`<`, `>`, etc) in plaintext replies are now escaped
   during creation of the rich reply
-* Don't include sensitive information in `Debug`-format of types from the `events::key`
+- Don't include sensitive information in `Debug`-format of types from the `events::key`
   and `events::secret` modules
-* Fix deserialization of `RoomMessageEventContent` and `RoomEncryptedEventContent` when there
+- Fix deserialization of `RoomMessageEventContent` and `RoomEncryptedEventContent` when there
   is no relation
-* Fix deserialization of `StateUnsigned` when the `prev_content` is redacted
-* Allow to deserialize `PushCondition` with unknown kind
-* Allow to deserialize `push::Action` with unknown value
-* Only percent-encode reserved characters in endpoint URL path
+- Fix deserialization of `StateUnsigned` when the `prev_content` is redacted
+- Allow to deserialize `PushCondition` with unknown kind
+- Allow to deserialize `push::Action` with unknown value
+- Only percent-encode reserved characters in endpoint URL path
 
 Breaking changes:
 
-* Remove deprecated `EventType` enum
-* Remove deprecated constructors for `RoomMessageEventContent`
-* Remove `serde::vec_as_map_of_empty` from the public API
-* Remove the `api::AuthScheme::QueryOnlyAccessToken` variant, which is no longer used
-* The `#[ruma_api(header)]` attribute of the `ruma_api` macro now accepts an arbitrary
+- Remove deprecated `EventType` enum
+- Remove deprecated constructors for `RoomMessageEventContent`
+- Remove `serde::vec_as_map_of_empty` from the public API
+- Remove the `api::AuthScheme::QueryOnlyAccessToken` variant, which is no longer used
+- The `#[ruma_api(header)]` attribute of the `ruma_api` macro now accepts an arbitrary
   `http::header::HeaderName`
-  * To continue using constants from `http::header`, they must be imported in
+  - To continue using constants from `http::header`, they must be imported in
     the module calling the macro.
-* Make `name` optional on `SecretStorageKeyEventContent`. Default constructor has been
+- Make `name` optional on `SecretStorageKeyEventContent`. Default constructor has been
   adjusted as well to not require this field.
-* Rename `push::PusherData` to `HttpPusherData` and make the `url` field required
-* Remove `Ruleset::add` and the implementation of `Extend<AnyPushRule>` for `Ruleset`
-* Make `EndpointError` construction infallible
-  * `EndpointError::try_from_http_request` has been replaced by `EndpointError::from_http_request`
-  * `FromHttpResponseError<E>::Server` now contains `E` instead of `ServerError<E>`
-  * `ServerError<E>` has been removed
-  * `MatrixError` is now an enum with the `Json` variant containing the previous fields
-* Change the `ignored_users` field of `IgnoredUserListEventContent` to a map of empty structs, to
+- Rename `push::PusherData` to `HttpPusherData` and make the `url` field required
+- Remove `Ruleset::add` and the implementation of `Extend<AnyPushRule>` for `Ruleset`
+- Make `EndpointError` construction infallible
+  - `EndpointError::try_from_http_request` has been replaced by `EndpointError::from_http_request`
+  - `FromHttpResponseError<E>::Server` now contains `E` instead of `ServerError<E>`
+  - `ServerError<E>` has been removed
+  - `MatrixError` is now an enum with the `Json` variant containing the previous fields
+- Change the `ignored_users` field of `IgnoredUserListEventContent` to a map of empty structs, to
   allow eventual fields to be added, as intended by the spec
-* Make `SimplePushRule` and associated types generic over the expected type of the `rule_id`
-* Deduplicate and group relation structs in `events::relation`:
-  * Move relation structs under `events::room::message` to `events::relation`
-  * Move common relation structs under `events::room::encrypted` to `events::relation` and remove
+- Make `SimplePushRule` and associated types generic over the expected type of the `rule_id`
+- Deduplicate and group relation structs in `events::relation`:
+  - Move relation structs under `events::room::message` to `events::relation`
+  - Move common relation structs under `events::room::encrypted` to `events::relation` and remove
     duplicate types
-  * Remove `events::reaction::Relation` and use `events::relation::Annotation` instead
-  * Remove `events::key::verification::Relation` and use `events::relation::Reference` instead
-* Rename `events::relation::Relations` to `BundledRelations`
-* Make the `redacted_because` field in `UnsignedRedacted` non-optional and replace parameterless
+  - Remove `events::reaction::Relation` and use `events::relation::Annotation` instead
+  - Remove `events::key::verification::Relation` and use `events::relation::Reference` instead
+- Rename `events::relation::Relations` to `BundledRelations`
+- Make the `redacted_because` field in `UnsignedRedacted` non-optional and replace parameterless
   `new` constructor by one that takes a redaction event (like `new_because` previously, which is
   now removed)
-* Move the `Unsigned` associated type from `StateEventContent` to `OriginalStateEventContent`
-  * `Redacted*EventContent`s don't have an `unsigned` type anymore
-* Remove the `serde::urlencoded` module
-  * Query string (de)serialization is now done by the `serde_html_form` crate
-* Rename `RoomEventType` to `TimelineEventType`
-* Remove `SecretStorageKeyEventContent`'s implementation of `Deserialize`
-  * Use `EventContentFromType::from_parts` instead
-* Remove `StateUnsignedFromParts`
-  * Replace it with a bound on `DeserializeOwned`
-* Remove `Raw::deserialize_content`
-  * Instead, use `.deserialize_as::<T>()` or `.cast_ref::<T>().deserialize_with_type()`
-* Remove `EventContent::from_parts`
-  * Replace it with `EventContentFromType::from_parts`
-* The `serde::StringEnum` derive now also generates a `Debug` implementation
+- Move the `Unsigned` associated type from `StateEventContent` to `OriginalStateEventContent`
+  - `Redacted*EventContent`s don't have an `unsigned` type anymore
+- Remove the `serde::urlencoded` module
+  - Query string (de)serialization is now done by the `serde_html_form` crate
+- Rename `RoomEventType` to `TimelineEventType`
+- Remove `SecretStorageKeyEventContent`'s implementation of `Deserialize`
+  - Use `EventContentFromType::from_parts` instead
+- Remove `StateUnsignedFromParts`
+  - Replace it with a bound on `DeserializeOwned`
+- Remove `Raw::deserialize_content`
+  - Instead, use `.deserialize_as::<T>()` or `.cast_ref::<T>().deserialize_with_type()`
+- Remove `EventContent::from_parts`
+  - Replace it with `EventContentFromType::from_parts`
+- The `serde::StringEnum` derive now also generates a `Debug` implementation
 
 Improvements:
 
-* Add `MatrixVersion::V1_4` and `MatrixVersion::V1_5`
-* Stabilize default room server ACL push rule
-* Stabilize `room_types` in `directory::Filter` and `room_type` in `directory::PublicRoomsChunk`
-* Stabilize support for private read receipts
-* Add stable support for threads
-  * Move `Relation::Thread` and associated types and methods out of `unstable-msc3440`
-  * Add parameter to `RoomMessageEventContent::make_reply_to` to be thread-aware
-  * Add `RoomMessageEventContent::make_for_reply`
-* Stabilize support for event replacements (edits)
-* Add support for read receipts for threads (MSC3771 / Matrix 1.4)
-* Add `push::PredefinedRuleId` and associated types as a list of predefined push rule IDs
-* Add convenience methods to `Ruleset`
-  * `Ruleset::get` to access a push rule
-  * `Ruleset::insert` to add or update user push rules
-  * `Ruleset::set_enabled` to change the enabled state of push rules
-  * `Ruleset::set_actions` to change the actions of push rules
-* Add support for bundled reference relations (MSC3267 / Matrix 1.5)
-* Add the `formatted` field on `KeyVerificationRequestEventContent` (Matrix 1.5)
-* Add `content` accessors for `Any*StateEvent` enums
-* Add the `DebugAsRefStr` derive macro to `ruma_common::serde`
+- Add `MatrixVersion::V1_4` and `MatrixVersion::V1_5`
+- Stabilize default room server ACL push rule
+- Stabilize `room_types` in `directory::Filter` and `room_type` in `directory::PublicRoomsChunk`
+- Stabilize support for private read receipts
+- Add stable support for threads
+  - Move `Relation::Thread` and associated types and methods out of `unstable-msc3440`
+  - Add parameter to `RoomMessageEventContent::make_reply_to` to be thread-aware
+  - Add `RoomMessageEventContent::make_for_reply`
+- Stabilize support for event replacements (edits)
+- Add support for read receipts for threads (MSC3771 / Matrix 1.4)
+- Add `push::PredefinedRuleId` and associated types as a list of predefined push rule IDs
+- Add convenience methods to `Ruleset`
+  - `Ruleset::get` to access a push rule
+  - `Ruleset::insert` to add or update user push rules
+  - `Ruleset::set_enabled` to change the enabled state of push rules
+  - `Ruleset::set_actions` to change the actions of push rules
+- Add support for bundled reference relations (MSC3267 / Matrix 1.5)
+- Add the `formatted` field on `KeyVerificationRequestEventContent` (Matrix 1.5)
+- Add `content` accessors for `Any*StateEvent` enums
+- Add the `DebugAsRefStr` derive macro to `ruma_common::serde`
 
-# 0.10.5
+## 0.10.5
 
 Improvements:
 
-* Add support for `#[incoming_derive(!Debug)]` to the `Incoming` derive macro
+- Add support for `#[incoming_derive(!Debug)]` to the `Incoming` derive macro
 
-# 0.10.4
-
-Bug fixes:
-
-* Fix `MatrixToUri` parsing for non-url-encoded room aliases
-
-# 0.10.3
+## 0.10.4
 
 Bug fixes:
 
-* Fix ruma-common not compiling with the Cargo features `events` and
+- Fix `MatrixToUri` parsing for non-url-encoded room aliases
+
+## 0.10.3
+
+Bug fixes:
+
+- Fix ruma-common not compiling with the Cargo features `events` and
   `unstable-msc2677` active, and `unstable-msc2676` inactive
 
-# 0.10.2
+## 0.10.2
 
 Improvements:
 
-* Add `relations` accessors to event enum types:
-  * `AnyMessageLikeEvent` and `AnySyncMessageLikeEvent`
-  * `AnyStateEvent` and `AnySyncStateEvent`
-  * `AnyTimelineEvent` and `AnySyncTimelineEvent`
+- Add `relations` accessors to event enum types:
+  - `AnyMessageLikeEvent` and `AnySyncMessageLikeEvent`
+  - `AnyStateEvent` and `AnySyncStateEvent`
+  - `AnyTimelineEvent` and `AnySyncTimelineEvent`
 
-# 0.10.1
+## 0.10.1
 
 Improvements:
 
-* Add `RoomMessageEventContent::make_reply_to`
-  * Deprecate reply constructors in favor of the new method
+- Add `RoomMessageEventContent::make_reply_to`
+  - Deprecate reply constructors in favor of the new method
 
-# 0.10.0
+## 0.10.0
 
 Bug fixes:
 
-* Expose `MatrixIdError`, `MatrixToError`, `MatrixUriError` and `MxcUriError` at
+- Expose `MatrixIdError`, `MatrixToError`, `MatrixUriError` and `MxcUriError` at
   the crate root
-* Fix matching of `event_match` condition
-  * The spec clarified its behavior:
-    <https://github.com/matrix-org/matrix-spec-proposals/pull/3690> 
+- Fix matching of `event_match` condition
+  - The spec clarified its behavior:
+    <https://github.com/matrix-org/matrix-spec-proposals/pull/3690>
 
 Breaking changes:
 
-* Add `user_id` field to `PushConditionRoomCtx`
-* Remove `PartialEq` implementation on `NotificationPowerLevels`
-* Remove `PartialEq` implementation for `events::call::SessionDescription`
-* Use new `events::call::AnswerSessionDescription` for `CallAnswerEventContent` 
+- Add `user_id` field to `PushConditionRoomCtx`
+- Remove `PartialEq` implementation on `NotificationPowerLevels`
+- Remove `PartialEq` implementation for `events::call::SessionDescription`
+- Use new `events::call::AnswerSessionDescription` for `CallAnswerEventContent`
   and `OfferSessionDescription` for `CallInviteEventContent`
-* Use new `VoipVersionId` and `VoipId` types for `events::call` events
-* Remove `RoomName` / `OwnedRoomName` and replace usages with `str` / `String`
-  * Room name size limits were never enforced by servers
+- Use new `VoipVersionId` and `VoipId` types for `events::call` events
+- Remove `RoomName` / `OwnedRoomName` and replace usages with `str` / `String`
+  - Room name size limits were never enforced by servers
     ([Spec change removing the size limit][spec])
-* Remove `RoomMessageFeedbackEvent` and associated types and variants according to MSC3582
-* Move `CanonicalJson`, `CanonicalJsonObject` and `CanonicalJsonError` out of
+- Remove `RoomMessageFeedbackEvent` and associated types and variants according to MSC3582
+- Move `CanonicalJson`, `CanonicalJsonObject` and `CanonicalJsonError` out of
   the `serde` module and behind the cargo feature flag `canonical-json`
-* Make identifiers matrix URI constructors generic over owned parameters
-  * Split `RoomId` matrix URI constructors between methods with and without routing
-* Allow to add routing servers to `RoomId::matrix_to_event_uri()`
-* Move `receipt::ReceiptType` to `events::receipt`
-* Make `Clone` as supertrait of `api::OutgoingRequest`
-* Rename `Any[Sync]RoomEvent` to `Any[Sync]TimelineEvent`
-* `RoomMemberEvent` and related types now have a custom unsigned type including the
+- Make identifiers matrix URI constructors generic over owned parameters
+  - Split `RoomId` matrix URI constructors between methods with and without routing
+- Allow to add routing servers to `RoomId::matrix_to_event_uri()`
+- Move `receipt::ReceiptType` to `events::receipt`
+- Make `Clone` as supertrait of `api::OutgoingRequest`
+- Rename `Any[Sync]RoomEvent` to `Any[Sync]TimelineEvent`
+- `RoomMemberEvent` and related types now have a custom unsigned type including the
   `invite_room_state` field, instead of the `StateUnsigned` type used by other state
   events
 
@@ -561,185 +781,185 @@ Breaking changes:
 
 Improvements:
 
-* All push rules are now considered to not apply to events sent by the user themselves
-* Change `events::relation::BundledAnnotation` to a struct instead of an enum
-  * Remove `BundledReaction`
-* Add unstable support for polls (MSC3381)
-* Add unstable support for Improved Signalling for 1:1 VoIP (MSC2746)
-* Add support for knocking in `events::room::member::MembershipChange`
-* Add `MatrixVersion::V1_3`
-* Deprecate the `sender_key` and `device_id` fields for encrypted events (MSC3700)
-* Move the `relations` field of `events::unsigned` types out of `unstable-msc2675`
-* Deserialize stringified integers for power levels without the `compat` feature
-* Add `JoinRule::KnockRestricted` (MSC3787)
-* Add `MatrixVersionId::V10` (MSC3604)
-* Add methods to sanitize messages according to the spec behind the `html` feature
-  * Can also remove rich reply fallbacks
-* Implement `From<Owned*Id>` for `identifiers::matrix_uri::MatrixId`
-* Add unstable default push rule to ignore room server ACLs events (MSC3786)
-* Add unstable support for private read receipts (MSC2285)
-* Add unstable support for filtering public rooms by room type (MSC3827)
+- All push rules are now considered to not apply to events sent by the user themselves
+- Change `events::relation::BundledAnnotation` to a struct instead of an enum
+  - Remove `BundledReaction`
+- Add unstable support for polls (MSC3381)
+- Add unstable support for Improved Signalling for 1:1 VoIP (MSC2746)
+- Add support for knocking in `events::room::member::MembershipChange`
+- Add `MatrixVersion::V1_3`
+- Deprecate the `sender_key` and `device_id` fields for encrypted events (MSC3700)
+- Move the `relations` field of `events::unsigned` types out of `unstable-msc2675`
+- Deserialize stringified integers for power levels without the `compat` feature
+- Add `JoinRule::KnockRestricted` (MSC3787)
+- Add `MatrixVersionId::V10` (MSC3604)
+- Add methods to sanitize messages according to the spec behind the `html` feature
+  - Can also remove rich reply fallbacks
+- Implement `From<Owned*Id>` for `identifiers::matrix_uri::MatrixId`
+- Add unstable default push rule to ignore room server ACLs events (MSC3786)
+- Add unstable support for private read receipts (MSC2285)
+- Add unstable support for filtering public rooms by room type (MSC3827)
 
-# 0.9.2
+## 0.9.2
 
 Bug fixes:
 
-* Fix serialization and deserialization of events with a dynamic `event_type`
+- Fix serialization and deserialization of events with a dynamic `event_type`
 
-# 0.9.1
+## 0.9.1
 
 Improvements:
 
-* Add `StrippedPowerLevelsEvent::power_levels`
-* Add (`Sync`)`RoomMemberEvent::membership`
-* Export `events::room::member::Change`
-  * Prior to this, you couldn't actually do anything with the
+- Add `StrippedPowerLevelsEvent::power_levels`
+- Add (`Sync`)`RoomMemberEvent::membership`
+- Export `events::room::member::Change`
+  - Prior to this, you couldn't actually do anything with the
     `membership_change` functions on various member event types
 
-# 0.9.0
+## 0.9.0
 
 Bug fixes:
 
-* Change default `invite` power level to `0`
-  * The spec was determined to be wrong about the default:
+- Change default `invite` power level to `0`
+  - The spec was determined to be wrong about the default:
     <https://github.com/matrix-org/matrix-spec/pull/1021>
 
 Breaking changes:
 
-* Several ruma crates have been merged into `ruma-common`
-  * `ruma-api` has moved into `api`, behind a feature flag
-  * `ruma-events` has moved into `events`, behind a feature flag
-  * `ruma-identifiers` types are available at the root of the crate
-  * `ruma-serde` has moved into `serde`
-* The `events::*MessageEvent` types have been renamed to `*MessageLikeEvent`
-* Change `events::room` media types to accept either a plain file or an
+- Several ruma crates have been merged into `ruma-common`
+  - `ruma-api` has moved into `api`, behind a feature flag
+  - `ruma-events` has moved into `events`, behind a feature flag
+  - `ruma-identifiers` types are available at the root of the crate
+  - `ruma-serde` has moved into `serde`
+- The `events::*MessageEvent` types have been renamed to `*MessageLikeEvent`
+- Change `events::room` media types to accept either a plain file or an
   encrypted file, not both simultaneously
-* Change `events::room` media types to use `Duration` where applicable
-* Move `prev_content` into `unsigned`
-* Rename `identifiers::Error` to `IdParseError`
-* Fix the `RoomMessageEventContent::*_reply_plain` methods that now return a
+- Change `events::room` media types to use `Duration` where applicable
+- Move `prev_content` into `unsigned`
+- Rename `identifiers::Error` to `IdParseError`
+- Fix the `RoomMessageEventContent::*_reply_plain` methods that now return a
   message with a `formatted_body`, according to the spec. Therefore, they only
   accept `OriginalRoomMessageEvent`s like their HTML counterparts.
-* Update the `state_key` field of state events to be of a different type
+- Update the `state_key` field of state events to be of a different type
   depending on the content type. You now no longer need to validate manually
   that `m.room.member` events have a user ID as their state key!
 
 Improvements:
 
-* Add unstable support for extensible events (MSCs 1767, 3551, 3552, 3553, 3246, 3488)
-* Add unstable support for translatable text content (MSC3554)
-* Add unstable support for voice messages (MSC3245)
-* Add unstable support for threads (MSC3440)
-* Add `ReceiptEventContent::user_receipt`
-* Make `Restricted::allow` public
-* Conversion from `RoomPowerLevels` to `RoomPowerLevelsEventContent`
+- Add unstable support for extensible events (MSCs 1767, 3551, 3552, 3553, 3246, 3488)
+- Add unstable support for translatable text content (MSC3554)
+- Add unstable support for voice messages (MSC3245)
+- Add unstable support for threads (MSC3440)
+- Add `ReceiptEventContent::user_receipt`
+- Make `Restricted::allow` public
+- Conversion from `RoomPowerLevels` to `RoomPowerLevelsEventContent`
 
-# 0.8.0
-
-Breaking changes:
-
-* Update `ruma-identifiers` dependency
-
-# 0.7.0
+## 0.8.0
 
 Breaking changes:
 
-* Update `ruma-identifiers` dependency
-* Use new `Base64` type for `key` field of `SignedKey`
+- Update `ruma-identifiers` dependency
 
-# 0.6.0
+## 0.7.0
 
 Breaking changes:
 
-* Make a few enums non-exhaustive
-* Upgrade dependencies
+- Update `ruma-identifiers` dependency
+- Use new `Base64` type for `key` field of `SignedKey`
 
-# 0.5.4
+## 0.6.0
+
+Breaking changes:
+
+- Make a few enums non-exhaustive
+- Upgrade dependencies
+
+## 0.5.4
 
 Improvements:
 
-* Add `to_device` module containing `DeviceIdOrAllDevices`
+- Add `to_device` module containing `DeviceIdOrAllDevices`
 
-# 0.5.3
+## 0.5.3
 
 Improvements:
 
-* Add `instance_id` field to `ProtocolInstance[Init]` under the
+- Add `instance_id` field to `ProtocolInstance[Init]` under the
   `unstable-pre-spec` feature
 
-# 0.5.2
+## 0.5.2
 
 Improvements:
 
-* Add `thirdparty::ThirdPartyIdentifier`
+- Add `thirdparty::ThirdPartyIdentifier`
 
-# 0.5.1
+## 0.5.1
 
 Improvements:
 
-* Add `receipt::ReceiptType`
-* Add `MilliSecondsSinceUnixEpoch` and `SecondsSinceUnixEpoch` types
-* Bump dependency versions
+- Add `receipt::ReceiptType`
+- Add `MilliSecondsSinceUnixEpoch` and `SecondsSinceUnixEpoch` types
+- Bump dependency versions
 
-# 0.5.0
+## 0.5.0
 
 Breaking changes:
 
-* Rename `push::RulesetIter` to `push::RulesetIntoIter`
-* Change the return type of `push::Ruleset::get_actions` from an iterator to a
+- Rename `push::RulesetIter` to `push::RulesetIntoIter`
+- Change the return type of `push::Ruleset::get_actions` from an iterator to a
   slice
 
 Improvements:
 
-* Add `push::Ruleset::iter()` for borrowing iteration of rulesets
-* Add conversions between `AnyPushRule` and `AnyPushRuleRef`
+- Add `push::Ruleset::iter()` for borrowing iteration of rulesets
+- Add conversions between `AnyPushRule` and `AnyPushRuleRef`
   (`AnyPushRule::as_ref` and `AnyPushRuleRef::to_owned`)
-* Add `push::Ruleset::get_match()` for finding the first matching push rule for
+- Add `push::Ruleset::get_match()` for finding the first matching push rule for
   an event. This is pretty much the same thing as `get_actions()` but returns
   the entire push rule, not just its actions.
 
-# 0.4.0
+## 0.4.0
 
 Breaking changes:
 
-* Use `ruma_identifiers::MxcUri` instead of `String` for `avatar_url` field in
+- Use `ruma_identifiers::MxcUri` instead of `String` for `avatar_url` field in
   `directory::PublicRoomsChunk`
-* Use `ruma_identifiers::RoomId` instead of `String` for `room_id` field in
+- Use `ruma_identifiers::RoomId` instead of `String` for `room_id` field in
   `push::PushConditionRoomCtx`
-* Upgrade ruma-identifiers dependency to 0.19.0
+- Upgrade ruma-identifiers dependency to 0.19.0
 
-# 0.3.1
+## 0.3.1
 
 Bug fixes:
 
-* Fix `push::PushCondition::applies` for empty value and pattern
+- Fix `push::PushCondition::applies` for empty value and pattern
 
-# 0.3.0
+## 0.3.0
 
 Breaking changes:
 
-* Update set of conversion trait implementations for enums
-* Replace `Vec` by `IndexSet` in `push::Ruleset`
-* Replace `push::AnyPushRule` with an enum (the original struct still exists as
+- Update set of conversion trait implementations for enums
+- Replace `Vec` by `IndexSet` in `push::Ruleset`
+- Replace `push::AnyPushRule` with an enum (the original struct still exists as
   just `PushRule` in `ruma-client-api`)
-* … (there's a lot more, but this changelog was not kept up to date; PRs to
+- … (there's a lot more, but this changelog was not kept up to date; PRs to
   improve it are welcome)
 
 Improvements:
 
-* Add the `thirdparty` module
-* Add `directory::{Filter, PublicRoomsChunk, RoomNetwork}` (moved from
+- Add the `thirdparty` module
+- Add `directory::{Filter, PublicRoomsChunk, RoomNetwork}` (moved from
   `ruma_client_api::r0::directory`)
-* Add `push::{PusherData, PushFormat}` (moved from `ruma_client_api::r0::push`)
-* Add `authentication::TokenType` (moved from
+- Add `push::{PusherData, PushFormat}` (moved from `ruma_client_api::r0::push`)
+- Add `authentication::TokenType` (moved from
   `ruma_client_api::r0::account:request_openid_token`)
-* Add an `IntoIterator` implementation for `Ruleset`
-* Add `push::Ruleset::get_actions`
-  * Add `push::PushCondition::applies`
-  * Add `push::{FlattenedJson, PushConditionRoomCtx}`
+- Add an `IntoIterator` implementation for `Ruleset`
+- Add `push::Ruleset::get_actions`
+  - Add `push::PushCondition::applies`
+  - Add `push::{FlattenedJson, PushConditionRoomCtx}`
 
-# 0.2.0
+## 0.2.0
 
 Breaking changes:
 
-* Make most types defined by the crate `#[non_exhaustive]`
+- Make most types defined by the crate `#[non_exhaustive]`

@@ -1,6 +1,12 @@
 //! `PUT /_matrix/client/*/rooms/{roomId}/state/{eventType}/{txnId}`
 //!
-//! Send a delayed state event (a scheduled state event) to a room. [MSC](https://github.com/matrix-org/matrix-spec-proposals/pull/4140)
+//! Send a delayed state event (a scheduled state event) to a room.
+//!
+//! This endpoint implements a previous iteration of MSC4140 at commit [`3ee73ab`].
+//! At the time of writing, this matches the current implementation of Synapse but the latest
+//! iteration of the MSC uses the `send_delayed_event` endpoint instead.
+//!
+//! [`3ee73ab`]: https://github.com/matrix-org/matrix-spec-proposals/blob/3ee73abe5f81252b00877cfb5db941ee9aa6c18d/proposals/4140-delayed-events-futures.md
 
 pub mod unstable {
     //! `msc4140` ([MSC])
@@ -8,17 +14,17 @@ pub mod unstable {
     //! [MSC]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedRoomId,
     };
     use ruma_events::{AnyStateEventContent, StateEventContent, StateEventType};
     use serde_json::value::to_raw_value as to_raw_json_value;
 
     use crate::delayed_events::DelayParameters;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,11 +32,11 @@ pub mod unstable {
             // We use the unstable prefix for the delay query parameter but the stable v3 endpoint.
             unstable => "/_matrix/client/v3/rooms/{room_id}/state/{event_type}/{state_key}",
         }
-    };
+    }
 
     /// Request type for the [`delayed_state_event`](crate::delayed_events::delayed_state_event)
     /// endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to send the event to.
         #[ruma_api(path)]
@@ -58,7 +64,7 @@ pub mod unstable {
 
     /// Response type for the [`delayed_state_event`](crate::delayed_events::delayed_state_event)
     /// endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The `delay_id` generated for this delayed event. Used to interact with delayed events.
         pub delay_id: String,
@@ -105,7 +111,7 @@ pub mod unstable {
 
     impl Response {
         /// Creates a new `Response` with the tokens required to control the delayed event using the
-        /// [`crate::delayed_events::update_delayed_event::unstable::Request`] request.
+        /// [`crate::delayed_events::update_delayed_event::unstable_v1::Request`] request.
         pub fn new(delay_id: String) -> Self {
             Self { delay_id }
         }
@@ -113,12 +119,16 @@ pub mod unstable {
 
     #[cfg(all(test, feature = "client"))]
     mod tests {
+        use std::borrow::Cow;
+
         use ruma_common::{
-            api::{MatrixVersion, OutgoingRequest, SendAccessToken, SupportedVersions},
+            api::{
+                MatrixVersion, OutgoingRequest, SupportedVersions, auth_scheme::SendAccessToken,
+            },
             owned_room_id,
             serde::Raw,
         };
-        use serde_json::{json, Value as JsonValue};
+        use serde_json::{Value as JsonValue, json};
         use web_time::Duration;
 
         use super::Request;
@@ -142,7 +152,7 @@ pub mod unstable {
             .try_into_http_request(
                 "https://homeserver.tld",
                 SendAccessToken::IfRequired("auth_tok"),
-                &supported,
+                Cow::Owned(supported),
             )
             .unwrap()
             .into_parts()

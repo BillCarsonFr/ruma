@@ -6,18 +6,18 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1roomsroomidrelationseventidreltype
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1roomsroomidrelationseventidreltype
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Direction, Metadata},
+        OwnedEventId, OwnedRoomId,
+        api::{Direction, auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedEventId, OwnedRoomId,
     };
-    use ruma_events::{relation::RelationType, AnyMessageLikeEvent};
+    use ruma_events::{AnyMessageLikeEvent, relation::RelationType};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -25,10 +25,10 @@ pub mod v1 {
             unstable => "/_matrix/client/unstable/rooms/{room_id}/relations/{event_id}/{rel_type}",
             1.3 => "/_matrix/client/v1/rooms/{room_id}/relations/{event_id}/{rel_type}",
         }
-    };
+    }
 
     /// Request type for the `get_relating_events_with_rel_type` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The ID of the room containing the parent event.
         #[ruma_api(path)]
@@ -97,7 +97,7 @@ pub mod v1 {
     }
 
     /// Response type for the `get_relating_events_with_rel_type` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The paginated child events which point to the parent.
         ///

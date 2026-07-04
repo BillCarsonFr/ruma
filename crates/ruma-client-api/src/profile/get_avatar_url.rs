@@ -8,22 +8,23 @@ pub mod v3 {
     //! [spec]: https://spec.matrix.org/v1.15/client-server-api/#get_matrixclientv3profileuseridavatar_url
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedMxcUri, OwnedUserId,
+        OwnedMxcUri, OwnedUserId,
+        api::{auth_scheme::NoAccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/profile/{user_id}/avatar_url",
             1.1 => "/_matrix/client/v3/profile/{user_id}/avatar_url",
         }
-    };
+    }
 
     /// Request type for the `get_avatar_url` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The user whose avatar URL will be retrieved.
         #[ruma_api(path)]
@@ -31,7 +32,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_avatar_url` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// The user's avatar URL, if set.
@@ -56,6 +57,7 @@ pub mod v3 {
 
     impl Request {
         /// Creates a new `Request` with the given user ID.
+        #[deprecated = "Use the get_profile_field endpoint instead."]
         pub fn new(user_id: OwnedUserId) -> Self {
             Self { user_id }
         }

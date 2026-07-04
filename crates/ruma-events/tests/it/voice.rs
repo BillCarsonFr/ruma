@@ -4,23 +4,26 @@ use std::time::Duration;
 
 use assert_matches2::assert_matches;
 use js_int::uint;
-use ruma_common::{mxc_uri, owned_event_id, serde::CanBeEmpty, MilliSecondsSinceUnixEpoch};
+use ruma_common::{
+    MilliSecondsSinceUnixEpoch, canonical_json::assert_to_canonical_json_eq, owned_event_id,
+    owned_mxc_uri, serde::CanBeEmpty,
+};
 use ruma_events::{
+    AnyMessageLikeEvent, MessageLikeEvent,
     audio::Amplitude,
     file::FileContentBlock,
-    relation::InReplyTo,
+    relation::Reply,
     room::message::Relation,
     voice::{VoiceAudioDetailsContentBlock, VoiceEventContent},
-    AnyMessageLikeEvent, MessageLikeEvent,
 };
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use serde_json::{from_value as from_json_value, json};
 
 #[test]
 fn event_serialization() {
     let mut content = VoiceEventContent::with_plain_text(
         "Voice message",
         FileContentBlock::plain(
-            mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+            owned_mxc_uri!("mxc://notareal.hs/abcdef"),
             "voice_message.ogg".to_owned(),
         ),
         VoiceAudioDetailsContentBlock::new(
@@ -31,12 +34,11 @@ fn event_serialization() {
 
     content.file.mimetype = Some("audio/opus".to_owned());
     content.file.size = Some(uint!(897_774));
-    content.relates_to = Some(Relation::Reply {
-        in_reply_to: InReplyTo::new(owned_event_id!("$replyevent:example.com")),
-    });
+    content.relates_to =
+        Some(Relation::Reply(Reply::with_event_id(owned_event_id!("$replyevent:example.com"))));
 
-    assert_eq!(
-        to_json_value(&content).unwrap(),
+    assert_to_canonical_json_eq!(
+        content,
         json!({
             "org.matrix.msc1767.text": [
                 { "body": "Voice message" },

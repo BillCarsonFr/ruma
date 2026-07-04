@@ -1,8 +1,8 @@
 //! Types for the [`m.call.hangup`] event.
 //!
-//! [`m.call.hangup`]: https://spec.matrix.org/latest/client-server-api/#mcallhangup
+//! [`m.call.hangup`]: https://spec.matrix.org/v1.18/client-server-api/#mcallhangup
 
-use ruma_common::{serde::StringEnum, OwnedVoipId, VoipVersionId};
+use ruma_common::{OwnedVoipId, VoipVersionId, serde::StringEnum};
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
 
@@ -69,7 +69,7 @@ impl CallHangupEventContent {
 /// in the call negotiation, this should be `ice_failed` for when ICE negotiation fails or
 /// `invite_timeout` for when the other party did not answer in time.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, Default, PartialEq, Eq, StringEnum)]
+#[derive(Clone, Default, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Reason {

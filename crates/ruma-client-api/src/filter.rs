@@ -7,7 +7,7 @@ mod lazy_load;
 mod url;
 
 use js_int::UInt;
-use ruma_common::{serde::StringEnum, OwnedRoomId, OwnedUserId};
+use ruma_common::{OwnedRoomId, OwnedUserId, serde::StringEnum};
 use serde::{Deserialize, Serialize};
 
 pub use self::{lazy_load::LazyLoadOptions, url::UrlFilter};
@@ -15,7 +15,7 @@ use crate::PrivOwnedStr;
 
 /// Format to use for returned events.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, Default, PartialEq, Eq, StringEnum)]
+#[derive(Clone, Default, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum EventFormat {
@@ -97,7 +97,7 @@ pub struct RoomEventFilter {
     ///
     /// Only applies to the [`sync_events`] endpoint.
     ///
-    /// [per-thread notification counts]: https://spec.matrix.org/latest/client-server-api/#receiving-notifications
+    /// [per-thread notification counts]: https://spec.matrix.org/v1.18/client-server-api/#receiving-notifications
     /// [`sync_events`]: crate::sync::sync_events
     #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
     pub unread_thread_notifications: bool,
@@ -120,7 +120,7 @@ impl RoomEventFilter {
     ///
     /// Redundant membership events are disabled.
     ///
-    /// [room member lazy-loading]: https://spec.matrix.org/latest/client-server-api/#lazy-loading-room-members
+    /// [room member lazy-loading]: https://spec.matrix.org/v1.18/client-server-api/#lazy-loading-room-members
     pub fn with_lazy_loading() -> Self {
         Self {
             lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false },
@@ -203,7 +203,7 @@ impl RoomFilter {
     ///
     /// Redundant membership events are disabled.
     ///
-    /// [room member lazy-loading]: https://spec.matrix.org/latest/client-server-api/#lazy-loading-room-members
+    /// [room member lazy-loading]: https://spec.matrix.org/v1.18/client-server-api/#lazy-loading-room-members
     pub fn with_lazy_loading() -> Self {
         Self { state: RoomEventFilter::with_lazy_loading(), ..Default::default() }
     }
@@ -335,7 +335,7 @@ impl FilterDefinition {
     ///
     /// Redundant membership events are disabled.
     ///
-    /// [room member lazy-loading]: https://spec.matrix.org/latest/client-server-api/#lazy-loading-room-members
+    /// [room member lazy-loading]: https://spec.matrix.org/v1.18/client-server-api/#lazy-loading-room-members
     pub fn with_lazy_loading() -> Self {
         Self { room: RoomFilter::with_lazy_loading(), ..Default::default() }
     }
@@ -367,42 +367,41 @@ can_be_empty!(RoomFilter);
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::canonical_json::assert_to_canonical_json_eq;
+    use serde_json::{
+        from_str as from_json_str, from_value as from_json_value, json, to_string as to_json_string,
+    };
 
     use super::{
         Filter, FilterDefinition, LazyLoadOptions, RoomEventFilter, RoomFilter, UrlFilter,
     };
 
     #[test]
-    fn default_filters_are_empty() -> serde_json::Result<()> {
-        assert_eq!(to_json_value(Filter::default())?, json!({}));
-        assert_eq!(to_json_value(FilterDefinition::default())?, json!({}));
-        assert_eq!(to_json_value(RoomEventFilter::default())?, json!({}));
-        assert_eq!(to_json_value(RoomFilter::default())?, json!({}));
-
-        Ok(())
+    fn default_filters_are_empty() {
+        assert_to_canonical_json_eq!(Filter::default(), json!({}));
+        assert_to_canonical_json_eq!(FilterDefinition::default(), json!({}));
+        assert_to_canonical_json_eq!(RoomEventFilter::default(), json!({}));
+        assert_to_canonical_json_eq!(RoomFilter::default(), json!({}));
     }
 
     #[test]
-    fn filter_definition_roundtrip() -> serde_json::Result<()> {
+    fn filter_definition_roundtrip() {
         let filter = FilterDefinition::default();
-        let filter_str = to_json_value(&filter)?;
+        assert_to_canonical_json_eq!(filter, json!({}));
 
-        let incoming_filter = from_json_value::<FilterDefinition>(filter_str)?;
+        let filter_str = to_json_string(&filter).unwrap();
+        let incoming_filter = from_json_str::<FilterDefinition>(&filter_str).unwrap();
         assert!(incoming_filter.is_empty());
-
-        Ok(())
     }
 
     #[test]
-    fn room_filter_definition_roundtrip() -> serde_json::Result<()> {
+    fn room_filter_definition_roundtrip() {
         let filter = RoomFilter::default();
-        let room_filter = to_json_value(filter)?;
+        assert_to_canonical_json_eq!(filter, json!({}));
 
-        let incoming_room_filter = from_json_value::<RoomFilter>(room_filter)?;
+        let filter_str = to_json_string(&filter).unwrap();
+        let incoming_room_filter = from_json_str::<RoomFilter>(&filter_str).unwrap();
         assert!(incoming_room_filter.is_empty());
-
-        Ok(())
     }
 
     #[test]

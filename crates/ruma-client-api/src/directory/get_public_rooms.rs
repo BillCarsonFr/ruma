@@ -5,27 +5,28 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3publicrooms
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3publicrooms
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedServerName,
+        api::{auth_scheme::NoAccessToken, request, response},
         directory::PublicRoomsChunk,
-        metadata, OwnedServerName,
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/publicRooms",
             1.1 => "/_matrix/client/v3/publicRooms",
         }
-    };
+    }
 
     /// Request type for the `get_public_rooms` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {
         /// Limit for the number of results to return.
@@ -47,7 +48,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_public_rooms` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A paginated chunk of public rooms.
         pub chunk: Vec<PublicRoomsChunk>,
@@ -86,9 +87,14 @@ pub mod v3 {
         #[cfg(feature = "client")]
         #[test]
         fn construct_request_from_refs() {
+            use std::borrow::Cow;
+
             use ruma_common::{
-                api::{MatrixVersion, OutgoingRequest as _, SendAccessToken, SupportedVersions},
-                server_name,
+                api::{
+                    MatrixVersion, OutgoingRequest as _, SupportedVersions,
+                    auth_scheme::SendAccessToken,
+                },
+                owned_server_name,
             };
 
             let supported = SupportedVersions {
@@ -99,12 +105,12 @@ pub mod v3 {
             let req = super::Request {
                 limit: Some(uint!(10)),
                 since: Some("hello".to_owned()),
-                server: Some(server_name!("test.tld").to_owned()),
+                server: Some(owned_server_name!("test.tld")),
             }
             .try_into_http_request::<Vec<u8>>(
                 "https://homeserver.tld",
                 SendAccessToken::IfRequired("auth_tok"),
-                &supported,
+                Cow::Owned(supported),
             )
             .unwrap();
 

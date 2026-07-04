@@ -5,25 +5,25 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3registeravailable
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3registeravailable
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::NoAccessToken, request, response},
         metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/register/available",
             1.1 => "/_matrix/client/v3/register/available",
         }
-    };
+    }
 
     /// Request type for the `get_username_availability` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The username to check the availability of.
         #[ruma_api(query)]
@@ -31,7 +31,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_username_availability` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A flag to indicate that the username is available.
         /// This should always be true when the server replies with 200 OK.

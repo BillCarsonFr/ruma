@@ -1,16 +1,14 @@
 //! Common types and functions for the [content repository].
 //!
-//! [content repository]: https://spec.matrix.org/latest/client-server-api/#content-repository
+//! [content repository]: https://spec.matrix.org/v1.18/client-server-api/#content-repository
 
 use std::time::Duration;
 
-use ruma_macros::{OrdAsRefStr, PartialEqAsRefStr, PartialOrdAsRefStr};
-
-use crate::{serde::StringEnum, PrivOwnedStr};
+use crate::{PrivOwnedStr, serde::StringEnum};
 
 /// The desired resizing method for a thumbnail.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, StringEnum, PartialEqAsRefStr, Eq, PartialOrdAsRefStr, OrdAsRefStr)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Method {

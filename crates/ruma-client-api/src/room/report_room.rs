@@ -5,14 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3roomsroomidreport
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3roomsroomidreport
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId,
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -20,10 +21,10 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/org.matrix.msc4151/rooms/{room_id}/report",
             1.13 => "/_matrix/client/v3/rooms/{room_id}/report",
         }
-    };
+    }
 
     /// Request type for the `report_room` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The ID of the room to report.
         #[ruma_api(path)]
@@ -39,7 +40,7 @@ pub mod v3 {
     }
 
     /// Response type for the `report_room` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

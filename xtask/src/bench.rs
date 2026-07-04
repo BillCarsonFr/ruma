@@ -1,7 +1,7 @@
 use clap::{Args, Subcommand};
 use xshell::Shell;
 
-use crate::{cmd, Result};
+use crate::{Result, cmd};
 
 #[derive(Args)]
 pub struct BenchTask {
@@ -43,7 +43,7 @@ impl BenchTask {
         };
 
         let sh = Shell::new()?;
-        cmd!(sh, "rustup run stable cargo bench {packages...} --features criterion")
+        cmd!(sh, "rustup run stable cargo bench {packages...} --features __criterion")
             .run()
             .map_err(Into::into)
     }

@@ -5,15 +5,15 @@ use std::{collections::HashMap, path::PathBuf};
 #[cfg(feature = "default")]
 use reqwest::blocking::Client;
 use semver::Version;
-use serde::{de::IgnoredAny, Deserialize};
+use serde::{Deserialize, de::IgnoredAny};
 #[cfg(feature = "default")]
-use toml_edit::{value, DocumentMut};
+use toml_edit::{DocumentMut, value};
 #[cfg(feature = "default")]
 use xshell::Shell;
 
 #[cfg(feature = "default")]
 use crate::cmd;
-use crate::{util::ask_yes_no, Metadata, Result};
+use crate::{Metadata, Result, util::ask_yes_no};
 
 const CRATESIO_API: &str = "https://crates.io/api/v1/crates";
 
@@ -34,7 +34,6 @@ pub struct Package {
     pub dependencies: Vec<Dependency>,
 
     /// A map of the package features.
-    #[serde(default)]
     pub features: HashMap<String, Vec<String>>,
 }
 
@@ -70,6 +69,48 @@ impl Package {
         }
 
         false
+    }
+
+    /// The list of features matching the given filter.
+    pub fn filtered_features(&self, filter: FeatureFilter) -> Vec<&str> {
+        if filter == FeatureFilter::Default {
+            return self
+                .features
+                .get("default")
+                .into_iter()
+                .flatten()
+                .map(String::as_str)
+                .collect();
+        }
+
+        self.features
+            .keys()
+            .filter(move |feature| {
+                // We always filter out private features.
+                if FeatureFilter::is_private(feature) {
+                    return false;
+                }
+
+                match filter {
+                    FeatureFilter::Default => unreachable!(),
+                    FeatureFilter::Stable => {
+                        !FeatureFilter::is_unstable(feature) && !FeatureFilter::is_compat(feature)
+                    }
+                    FeatureFilter::Unstable => FeatureFilter::is_unstable(feature),
+                    FeatureFilter::UnstableAndCompat => {
+                        FeatureFilter::is_unstable(feature) || FeatureFilter::is_compat(feature)
+                    }
+                    FeatureFilter::ApiClient => {
+                        FeatureFilter::is_api_client(feature) || FeatureFilter::is_unstable(feature)
+                    }
+                    FeatureFilter::ApiServer => {
+                        FeatureFilter::is_api_server(feature) || FeatureFilter::is_unstable(feature)
+                    }
+                    FeatureFilter::All => true,
+                }
+            })
+            .map(String::as_str)
+            .collect()
     }
 }
 
@@ -184,13 +225,13 @@ impl Package {
             ..self.version.clone()
         };
 
-        let (update, title_start) = if let Some(pos) = changelog.find(&format!("# {version}\n")) {
+        let (update, title_start) = if let Some(pos) = changelog.find(&format!("## {version}\n")) {
             (false, pos)
-        } else if update
-            && (changelog.starts_with(&format!("# {version} (unreleased)\n"))
-                || changelog.starts_with("# [unreleased]\n"))
+        } else if update && let Some(pos) = changelog.find(&format!("## {version} (unreleased)\n"))
         {
-            (true, 0)
+            (true, pos)
+        } else if update && let Some(pos) = changelog.find("## Unreleased\n") {
+            (true, pos)
         } else {
             return Err("Could not find version title in changelog".into());
         };
@@ -202,7 +243,7 @@ impl Package {
             }
         };
 
-        let changes_end = match changelog[changes_start..].find("\n# ") {
+        let changes_end = match changelog[changes_start..].find("\n## ") {
             Some(p) => changes_start + p,
             None => changelog.len(),
         };
@@ -214,7 +255,8 @@ impl Package {
 
         if update {
             let rest = &changelog[changes_end..];
-            let changelog = format!("# [unreleased]\n\n# {}\n\n{changes}\n{rest}", self.version);
+            let changelog =
+                format!("# Changelog\n\n## Unreleased\n\n## {}\n\n{changes}\n{rest}", self.version);
 
             sh.write_file(&changelog_path, changelog)?;
         }
@@ -244,6 +286,58 @@ impl Package {
         }
 
         Ok(())
+    }
+}
+
+/// The package features to filter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeatureFilter {
+    /// Only the default features.
+    Default,
+
+    /// Only the stable features.
+    Stable,
+
+    /// Only the unstable features.
+    Unstable,
+
+    /// Only the unstable and compat features.
+    UnstableAndCompat,
+
+    /// The client API and unstable features.
+    ApiClient,
+
+    /// The server API and unstable features.
+    ApiServer,
+
+    /// All the public features.
+    All,
+}
+
+impl FeatureFilter {
+    /// Whether the given feature is an unstable feature.
+    fn is_unstable(feature: &str) -> bool {
+        feature.starts_with("unstable-")
+    }
+
+    /// Whether the given feature is an unstable feature.
+    fn is_compat(feature: &str) -> bool {
+        feature.starts_with("compat-")
+    }
+
+    /// Whether the given features is a private feature.
+    fn is_private(feature: &str) -> bool {
+        feature.starts_with("_")
+    }
+
+    /// Whether the given features is a client API feature.
+    fn is_api_client(feature: &str) -> bool {
+        feature.ends_with("-api-c")
+    }
+
+    /// Whether the given features is a server API feature.
+    fn is_api_server(feature: &str) -> bool {
+        feature.ends_with("-api-s")
     }
 }
 

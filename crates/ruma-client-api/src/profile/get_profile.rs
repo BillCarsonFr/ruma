@@ -5,31 +5,30 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3profileuserid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3profileuserid
 
-    use std::collections::{btree_map, BTreeMap};
+    use std::collections::btree_map;
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedUserId,
+        OwnedUserId,
+        api::{auth_scheme::NoAccessToken, request, response},
+        metadata,
+        profile::{ProfileFieldName, ProfileFieldValue, StaticProfileField, UserProfile},
     };
     use serde_json::Value as JsonValue;
 
-    #[cfg(feature = "unstable-msc4133")]
-    use crate::profile::{ProfileFieldName, ProfileFieldValue, StaticProfileField};
-
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/profile/{user_id}",
             1.1 => "/_matrix/client/v3/profile/{user_id}",
         }
-    };
+    }
 
     /// Request type for the `get_profile` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The user whose profile will be retrieved.
         #[ruma_api(path)]
@@ -37,12 +36,12 @@ pub mod v3 {
     }
 
     /// Response type for the `get_profile` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// The profile data.
         #[ruma_api(body)]
-        data: BTreeMap<String, JsonValue>,
+        pub data: UserProfile,
     }
 
     impl Request {
@@ -58,7 +57,7 @@ pub mod v3 {
             Self::default()
         }
 
-        /// Returns the value of the given capability.
+        /// Returns the value of the given profile field.
         pub fn get(&self, field: &str) -> Option<&JsonValue> {
             self.data.get(field)
         }
@@ -68,11 +67,10 @@ pub mod v3 {
         /// Returns `Ok(Some(_))` if the field is present and the value was deserialized
         /// successfully, `Ok(None)` if the field is not set, or an error if deserialization of the
         /// value failed.
-        #[cfg(feature = "unstable-msc4133")]
         pub fn get_static<F: StaticProfileField>(
             &self,
         ) -> Result<Option<F::Value>, serde_json::Error> {
-            self.data.get(F::NAME).map(|value| serde_json::from_value(value.clone())).transpose()
+            self.data.get_static::<F>()
         }
 
         /// Gets an iterator over the fields of the profile.
@@ -81,29 +79,32 @@ pub mod v3 {
         }
 
         /// Sets a field to the given value.
-        #[cfg(feature = "unstable-msc4133")]
-        pub fn set(&mut self, field: &str, value: JsonValue) {
-            self.data.insert(field.to_owned(), value);
+        pub fn set(&mut self, field: String, value: JsonValue) {
+            self.data.set(field, value);
+        }
+    }
+
+    impl From<UserProfile> for Response {
+        fn from(value: UserProfile) -> Self {
+            Self { data: value }
         }
     }
 
     impl FromIterator<(String, JsonValue)> for Response {
         fn from_iter<T: IntoIterator<Item = (String, JsonValue)>>(iter: T) -> Self {
-            Self { data: iter.into_iter().collect() }
+            Self { data: UserProfile::from_iter(iter) }
         }
     }
 
-    #[cfg(feature = "unstable-msc4133")]
     impl FromIterator<(ProfileFieldName, JsonValue)> for Response {
         fn from_iter<T: IntoIterator<Item = (ProfileFieldName, JsonValue)>>(iter: T) -> Self {
-            iter.into_iter().map(|(field, value)| (field.as_str().to_owned(), value)).collect()
+            Self { data: UserProfile::from_iter(iter) }
         }
     }
 
-    #[cfg(feature = "unstable-msc4133")]
     impl FromIterator<ProfileFieldValue> for Response {
         fn from_iter<T: IntoIterator<Item = ProfileFieldValue>>(iter: T) -> Self {
-            iter.into_iter().map(|value| (value.field_name(), value.value().into_owned())).collect()
+            Self { data: UserProfile::from_iter(iter) }
         }
     }
 
@@ -113,19 +114,15 @@ pub mod v3 {
         }
     }
 
-    #[cfg(feature = "unstable-msc4133")]
     impl Extend<(ProfileFieldName, JsonValue)> for Response {
         fn extend<T: IntoIterator<Item = (ProfileFieldName, JsonValue)>>(&mut self, iter: T) {
-            self.extend(iter.into_iter().map(|(field, value)| (field.as_str().to_owned(), value)));
+            self.data.extend(iter);
         }
     }
 
-    #[cfg(feature = "unstable-msc4133")]
     impl Extend<ProfileFieldValue> for Response {
         fn extend<T: IntoIterator<Item = ProfileFieldValue>>(&mut self, iter: T) {
-            self.extend(
-                iter.into_iter().map(|value| (value.field_name(), value.value().into_owned())),
-            );
+            self.data.extend(iter);
         }
     }
 
@@ -139,21 +136,17 @@ pub mod v3 {
     }
 }
 
-#[cfg(all(test, feature = "unstable-msc4133"))]
+#[cfg(test)]
 mod tests {
-    use ruma_common::owned_mxc_uri;
-    use serde_json::{
-        from_slice as from_json_slice, json, to_vec as to_json_vec, Value as JsonValue,
-    };
+    use serde_json::json;
 
     use super::v3::Response;
 
     #[test]
     #[cfg(feature = "server")]
     fn serialize_response() {
-        use ruma_common::api::OutgoingResponse;
-
-        use crate::profile::ProfileFieldValue;
+        use ruma_common::{api::OutgoingResponse, owned_mxc_uri, profile::ProfileFieldValue};
+        use serde_json::{Value as JsonValue, from_slice as from_json_slice};
 
         let response = [
             ProfileFieldValue::AvatarUrl(owned_mxc_uri!("mxc://localhost/abcdef")),
@@ -179,6 +172,7 @@ mod tests {
     #[cfg(feature = "client")]
     fn deserialize_response() {
         use ruma_common::api::IncomingResponse;
+        use serde_json::to_vec as to_json_vec;
 
         use crate::profile::{AvatarUrl, DisplayName};
 

@@ -1,6 +1,6 @@
 //! Types for the [`m.key.verification.done`] event.
 //!
-//! [`m.key.verification.done`]: https://spec.matrix.org/latest/client-server-api/#mkeyverificationdone
+//! [`m.key.verification.done`]: https://spec.matrix.org/v1.18/client-server-api/#mkeyverificationdone
 
 use ruma_common::OwnedTransactionId;
 use ruma_macros::EventContent;
@@ -49,8 +49,8 @@ impl KeyVerificationDoneEventContent {
 
 #[cfg(test)]
 mod tests {
-    use ruma_common::owned_event_id;
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{canonical_json::assert_to_canonical_json_eq, owned_event_id};
+    use serde_json::{from_value as from_json_value, json};
 
     use super::KeyVerificationDoneEventContent;
     use crate::relation::Reference;
@@ -58,17 +58,19 @@ mod tests {
     #[test]
     fn serialization() {
         let event_id = owned_event_id!("$1598361704261elfgc:localhost");
+        let content = KeyVerificationDoneEventContent {
+            relates_to: Reference { event_id: event_id.clone() },
+        };
 
-        let json_data = json!({
-            "m.relates_to": {
-                "rel_type": "m.reference",
-                "event_id": event_id,
-            }
-        });
-
-        let content = KeyVerificationDoneEventContent { relates_to: Reference { event_id } };
-
-        assert_eq!(to_json_value(&content).unwrap(), json_data);
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "m.relates_to": {
+                    "rel_type": "m.reference",
+                    "event_id": event_id,
+                },
+            }),
+        );
     }
 
     #[test]

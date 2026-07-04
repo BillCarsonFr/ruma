@@ -6,22 +6,23 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#get_matrixfederationv1make_leaveroomiduserid
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#get_matrixfederationv1make_leaveroomiduserid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId, OwnedUserId, RoomVersionId,
+        OwnedRoomId, OwnedUserId, RoomVersionId,
+        api::{request, response},
+        metadata,
     };
     use serde_json::value::RawValue as RawJsonValue;
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/make_leave/{room_id}/{user_id}",
-        }
-    };
+        path: "/_matrix/federation/v1/make_leave/{room_id}/{user_id}",
+    }
 
     /// Request type for the `get_leave_event` endpoint.
     #[request]

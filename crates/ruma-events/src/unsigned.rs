@@ -1,15 +1,18 @@
 use js_int::Int;
 use ruma_common::{
+    EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedTransactionId, OwnedUserId, UserId,
     serde::{CanBeEmpty, Raw},
-    MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedTransactionId, OwnedUserId,
 };
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{Deserialize, de::DeserializeOwned};
 
 use super::{
+    MessageLikeEventContent, OriginalSyncMessageLikeEvent, PossiblyRedactedStateEventContent,
     relation::{BundledMessageLikeRelations, BundledStateRelations},
     room::redaction::RoomRedactionEventContent,
-    MessageLikeEventContent, OriginalSyncMessageLikeEvent, PossiblyRedactedStateEventContent,
 };
+use crate::TimelineEventType;
+
+mod redacted_because_serde;
 
 /// Extra information about a message event that is not incorporated into the event's hash.
 #[derive(Clone, Debug, Deserialize)]
@@ -29,7 +32,7 @@ pub struct MessageLikeUnsigned<C: MessageLikeEventContent> {
 
     /// [Bundled aggregations] of related child events.
     ///
-    /// [Bundled aggregations]: https://spec.matrix.org/latest/client-server-api/#aggregations-of-child-events
+    /// [Bundled aggregations]: https://spec.matrix.org/v1.18/client-server-api/#aggregations-of-child-events
     #[serde(rename = "m.relations", default)]
     pub relations: BundledMessageLikeRelations<OriginalSyncMessageLikeEvent<C>>,
 }
@@ -73,12 +76,15 @@ pub struct StateUnsigned<C: PossiblyRedactedStateEventContent> {
     /// which sent it.
     pub transaction_id: Option<OwnedTransactionId>,
 
+    /// The event ID of the state event replaced by this event.
+    pub replaces_state: Option<OwnedEventId>,
+
     /// Optional previous content of the event.
     pub prev_content: Option<C>,
 
     /// [Bundled aggregations] of related child events.
     ///
-    /// [Bundled aggregations]: https://spec.matrix.org/latest/client-server-api/#aggregations-of-child-events
+    /// [Bundled aggregations]: https://spec.matrix.org/v1.18/client-server-api/#aggregations-of-child-events
     #[serde(rename = "m.relations", default)]
     pub relations: BundledStateRelations,
 }
@@ -86,7 +92,13 @@ pub struct StateUnsigned<C: PossiblyRedactedStateEventContent> {
 impl<C: PossiblyRedactedStateEventContent> StateUnsigned<C> {
     /// Create a new `Unsigned` with fields set to `None`.
     pub fn new() -> Self {
-        Self { age: None, transaction_id: None, prev_content: None, relations: Default::default() }
+        Self {
+            age: None,
+            transaction_id: None,
+            replaces_state: None,
+            prev_content: None,
+            relations: Default::default(),
+        }
     }
 }
 
@@ -115,17 +127,76 @@ impl<C: PossiblyRedactedStateEventContent> Default for StateUnsigned<C> {
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedUnsigned {
     /// The event that redacted this event, if any.
-    pub redacted_because: Raw<UnsignedRoomRedactionEvent>,
+    pub redacted_because: Raw<AnyRedactionEvent>,
 }
 
 impl RedactedUnsigned {
     /// Create a new `RedactedUnsigned` with the given redaction event.
-    pub fn new(redacted_because: Raw<UnsignedRoomRedactionEvent>) -> Self {
+    pub fn new(redacted_because: Raw<AnyRedactionEvent>) -> Self {
         Self { redacted_because }
     }
 }
 
-/// A redaction event as found in `unsigned.redacted_because`.
+/// Any event that can redact another event, i.e. an event that can be found in
+/// `unsigned.redacted_because`.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
+pub enum AnyRedactionEvent {
+    /// m.room.redaction
+    RoomRedaction(UnsignedRoomRedactionEvent),
+
+    /// m.room.member
+    #[cfg(feature = "unstable-msc4293")]
+    RoomMember(super::room::member::SyncRoomMemberEvent),
+
+    #[doc(hidden)]
+    _Custom(CustomRedactionEvent),
+}
+
+impl AnyRedactionEvent {
+    /// Returns the `type` of this event.
+    pub fn event_type(&self) -> TimelineEventType {
+        match self {
+            Self::RoomRedaction(_) => TimelineEventType::RoomRedaction,
+            #[cfg(feature = "unstable-msc4293")]
+            Self::RoomMember(_) => TimelineEventType::RoomMember,
+            Self::_Custom(e) => TimelineEventType::from(&*e.event_type),
+        }
+    }
+
+    /// Returns the `origin_server_ts` of this event.
+    pub fn origin_server_ts(&self) -> MilliSecondsSinceUnixEpoch {
+        match self {
+            Self::RoomRedaction(e) => e.origin_server_ts,
+            #[cfg(feature = "unstable-msc4293")]
+            Self::RoomMember(e) => e.origin_server_ts(),
+            Self::_Custom(e) => e.origin_server_ts,
+        }
+    }
+
+    /// Returns the `event_id` of this event.
+    pub fn event_id(&self) -> &EventId {
+        match self {
+            Self::RoomRedaction(e) => &e.event_id,
+            #[cfg(feature = "unstable-msc4293")]
+            Self::RoomMember(e) => e.event_id(),
+            Self::_Custom(e) => &e.event_id,
+        }
+    }
+
+    /// Returns the `sender` of this event.
+    pub fn sender(&self) -> &UserId {
+        match self {
+            Self::RoomRedaction(e) => &e.sender,
+            #[cfg(feature = "unstable-msc4293")]
+            Self::RoomMember(e) => e.sender(),
+            Self::_Custom(e) => &e.sender,
+        }
+    }
+}
+
+/// An `m.room.redaction` event as found in `unsigned.redacted_because`.
 ///
 /// While servers usually send this with the `redacts` field (unless nested), the ID of the event
 /// being redacted is known from context wherever this type is used, so it's not reflected as a
@@ -151,4 +222,68 @@ pub struct UnsignedRoomRedactionEvent {
     /// Additional key-value pairs not signed by the homeserver.
     #[serde(default)]
     pub unsigned: MessageLikeUnsigned<RoomRedactionEventContent>,
+}
+
+/// A custom redaction event.
+#[doc(hidden)]
+#[derive(Clone, Debug)]
+pub struct CustomRedactionEvent {
+    /// The type of the event
+    event_type: Box<str>,
+
+    /// The globally unique event identifier for the user who sent the event.
+    event_id: OwnedEventId,
+
+    /// The fully-qualified ID of the user who sent this event.
+    sender: OwnedUserId,
+
+    /// Timestamp in milliseconds on originating homeserver when this event was sent.
+    origin_server_ts: MilliSecondsSinceUnixEpoch,
+}
+
+#[cfg(test)]
+mod tests {
+    use assert_matches2::assert_matches;
+    use js_int::uint;
+    use serde_json::{from_value as from_json_value, json};
+
+    use super::AnyRedactionEvent;
+    use crate::TimelineEventType;
+
+    #[test]
+    fn deserialize_any_redaction_event_room_redaction() {
+        let json = json!({
+            "type": "m.room.redaction",
+            "content": {
+                "redacts": "$redactedevent",
+            },
+            "event_id": "$redactionevent",
+            "origin_server_ts": 1,
+            "sender": "@carl:example.com",
+        });
+
+        let event = from_json_value::<AnyRedactionEvent>(json).unwrap();
+        assert_eq!(event.event_id(), "$redactionevent");
+        assert_eq!(event.origin_server_ts().0, uint!(1));
+        assert_eq!(event.sender(), "@carl:example.com");
+        assert_eq!(event.event_type(), TimelineEventType::RoomRedaction);
+        assert_matches!(event, AnyRedactionEvent::RoomRedaction(_));
+    }
+
+    #[test]
+    fn deserialize_any_redaction_event_custom() {
+        let json = json!({
+            "type": "local.dev.custom_type",
+            "content": {},
+            "event_id": "$redactionevent",
+            "origin_server_ts": 1,
+            "sender": "@carl:example.com",
+        });
+
+        let event = from_json_value::<AnyRedactionEvent>(json).unwrap();
+        assert_eq!(event.event_id(), "$redactionevent");
+        assert_eq!(event.origin_server_ts().0, uint!(1));
+        assert_eq!(event.sender(), "@carl:example.com");
+        assert_eq!(event.event_type().to_string(), "local.dev.custom_type");
+    }
 }

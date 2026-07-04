@@ -5,15 +5,16 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#delete_matrixclientv3room_keyskeysroomid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#delete_matrixclientv3room_keyskeysroomid
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId,
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: DELETE,
         rate_limited: true,
         authentication: AccessToken,
@@ -22,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/room_keys/keys/{room_id}",
             1.1 => "/_matrix/client/v3/room_keys/keys/{room_id}",
         }
-    };
+    }
 
     /// Request type for the `delete_backup_keys_for_room` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The backup version from which to delete keys.
         #[ruma_api(query)]
@@ -37,7 +38,7 @@ pub mod v3 {
     }
 
     /// Response type for the `delete_backup_keys_for_room` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// An opaque string representing stored keys in the backup.
         ///

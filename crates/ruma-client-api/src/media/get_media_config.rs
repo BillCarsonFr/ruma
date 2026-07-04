@@ -5,15 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixmediav3config
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixmediav3config
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -22,10 +22,10 @@ pub mod v3 {
             1.1 => "/_matrix/media/v3/config",
             1.11 => deprecated,
         }
-    };
+    }
 
     /// Request type for the `get_media_config` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     #[deprecated = "\
         Since Matrix 1.11, clients should use `authenticated_media::get_media_config::v1::Request` \
@@ -34,7 +34,7 @@ pub mod v3 {
     pub struct Request {}
 
     /// Response type for the `get_media_config` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// Maximum size of upload in bytes.
         #[serde(rename = "m.upload.size")]

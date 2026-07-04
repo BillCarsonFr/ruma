@@ -2,8 +2,8 @@
 
 use std::ops::Deref;
 
-use js_int::{uint, UInt};
-use ruma_common::{serde::StringEnum, MilliSecondsSinceUnixEpoch};
+use js_int::{UInt, uint};
+use ruma_common::{MilliSecondsSinceUnixEpoch, serde::StringEnum};
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
 
@@ -14,9 +14,9 @@ mod poll_answers_serde;
 use poll_answers_serde::PollAnswersDeHelper;
 
 use super::{
-    compile_poll_results,
+    PollResponseData, compile_poll_results,
     end::{PollEndEventContent, PollResultsContentBlock},
-    generate_poll_end_fallback_text, PollResponseData,
+    generate_poll_end_fallback_text,
 };
 use crate::{message::TextContentBlock, room::message::Relation};
 
@@ -187,7 +187,7 @@ impl From<TextContentBlock> for PollQuestion {
 
 /// The kind of poll.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, Default, PartialEq, Eq, StringEnum)]
+#[derive(Clone, Default, StringEnum)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub enum PollKind {
     /// The results are revealed once the poll is closed.

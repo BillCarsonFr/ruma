@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use ruma_common::{OwnedUserId, UserId};
 use serde::{
-    de::{self, Deserialize, Deserializer, Unexpected},
     Serialize, Serializer,
+    de::{self, Deserialize, Deserializer, Unexpected},
 };
 /// A type that can be used as the `state_key` for call member state events.
 /// Those state keys can be a combination of UserId and DeviceId.
@@ -202,9 +202,9 @@ impl de::Expected for KeyParseError {
 mod tests {
     use std::str::FromStr;
 
-    use ruma_common::user_id;
+    use ruma_common::owned_user_id;
 
-    use crate::call::member::{member_state_key::CallMemberStateKeyEnum, CallMemberStateKey};
+    use crate::call::member::{CallMemberStateKey, member_state_key::CallMemberStateKeyEnum};
 
     #[test]
     fn convert_state_key_enum_to_state_key() {
@@ -216,7 +216,7 @@ mod tests {
         assert_eq!(state_key.as_ref(), key);
         // Compare to the from string without `CallMemberStateKeyEnum` step.
         let state_key_direct = CallMemberStateKey::new(
-            user_id!("@user:domain.org").to_owned(),
+            owned_user_id!("@user:domain.org"),
             Some("ABC".to_owned()),
             true,
         );
@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(state_key.as_ref(), key);
         // Compare to the from string without `CallMemberStateKeyEnum` step.
         let state_key_direct =
-            CallMemberStateKey::new(user_id!("@user:domain.org").to_owned(), None, false);
+            CallMemberStateKey::new(owned_user_id!("@user:domain.org"), None, false);
         assert_eq!(state_key, state_key_direct);
     }
 
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(state_key.as_ref(), key);
         // Compare to the from string without `CallMemberStateKeyEnum` step.
         let state_key_direct = CallMemberStateKey::new(
-            user_id!("@user:domain.org").to_owned(),
+            owned_user_id!("@user:domain.org"),
             Some("ABC_m.callTestId".to_owned()),
             false,
         );

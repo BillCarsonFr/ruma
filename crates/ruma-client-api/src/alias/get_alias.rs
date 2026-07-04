@@ -5,25 +5,26 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3directoryroomroomalias
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3directoryroomroomalias
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomAliasId, OwnedRoomId, OwnedServerName,
+        OwnedRoomAliasId, OwnedRoomId, OwnedServerName,
+        api::{auth_scheme::NoAccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/directory/room/{room_alias}",
             1.1 => "/_matrix/client/v3/directory/room/{room_alias}",
         }
-    };
+    }
 
     /// Request type for the `get_alias` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room alias.
         #[ruma_api(path)]
@@ -31,7 +32,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_alias` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The room ID for this room alias.
         pub room_id: OwnedRoomId,

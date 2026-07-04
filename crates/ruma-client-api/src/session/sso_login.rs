@@ -3,29 +3,28 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3loginssoredirect
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3loginssoredirect
 
     use http::header::{LOCATION, SET_COOKIE};
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::NoAccessToken, request, response},
         metadata,
     };
 
-    #[cfg(feature = "unstable-msc3824")]
-    use crate::session::SsoRedirectOidcAction;
+    use crate::session::SsoRedirectAction;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/login/sso/redirect",
             1.1 => "/_matrix/client/v3/login/sso/redirect",
         }
-    };
+    }
 
     /// Request type for the `sso_login` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// URL to which the homeserver should return the user after completing
         /// authentication with the SSO identity provider.
@@ -33,19 +32,14 @@ pub mod v3 {
         #[serde(rename = "redirectUrl")]
         pub redirect_url: String,
 
-        /// The purpose for using the SSO redirect URL for OIDC-aware compatibility.
-        ///
-        /// This field uses the unstable prefix defined in [MSC3824].
-        ///
-        /// [MSC3824]: https://github.com/matrix-org/matrix-spec-proposals/pull/3824
-        #[cfg(feature = "unstable-msc3824")]
+        /// The action that the user wishes to take at the SSO redirect.
         #[ruma_api(query)]
-        #[serde(skip_serializing_if = "Option::is_none", rename = "org.matrix.msc3824.action")]
-        pub action: Option<SsoRedirectOidcAction>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub action: Option<SsoRedirectAction>,
     }
 
     /// Response type for the `sso_login` endpoint.
-    #[response(error = crate::Error, status = FOUND)]
+    #[response(status = FOUND)]
     pub struct Response {
         /// Redirect URL to the SSO identity provider.
         #[ruma_api(header = LOCATION)]
@@ -59,11 +53,7 @@ pub mod v3 {
     impl Request {
         /// Creates a new `Request` with the given redirect URL.
         pub fn new(redirect_url: String) -> Self {
-            Self {
-                redirect_url,
-                #[cfg(feature = "unstable-msc3824")]
-                action: None,
-            }
+            Self { redirect_url, action: None }
         }
     }
 
@@ -76,8 +66,10 @@ pub mod v3 {
 
     #[cfg(all(test, feature = "client"))]
     mod tests {
+        use std::borrow::Cow;
+
         use ruma_common::api::{
-            MatrixVersion, OutgoingRequest, SendAccessToken, SupportedVersions,
+            MatrixVersion, OutgoingRequest, SupportedVersions, auth_scheme::SendAccessToken,
         };
 
         use super::Request;
@@ -89,7 +81,11 @@ pub mod v3 {
                 features: Default::default(),
             };
             let req: http::Request<Vec<u8>> = Request::new("https://example.com/sso".to_owned())
-                .try_into_http_request("https://homeserver.tld", SendAccessToken::None, &supported)
+                .try_into_http_request(
+                    "https://homeserver.tld",
+                    SendAccessToken::None,
+                    Cow::Owned(supported),
+                )
                 .unwrap();
 
             assert_eq!(

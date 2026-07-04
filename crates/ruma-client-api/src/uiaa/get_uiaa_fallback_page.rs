@@ -5,27 +5,27 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#fallback
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#fallback
 
     use ruma_common::{
-        api::{request, Metadata},
+        api::{auth_scheme::NoAccessToken, request},
         metadata,
     };
 
     use crate::uiaa::AuthType;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/client/r0/auth/{auth_type}/fallback/web",
             1.1 => "/_matrix/client/v3/auth/{auth_type}/fallback/web",
         }
-    };
+    }
 
     /// Request type for the `authorize_fallback` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The type name (`m.login.dummy`, etc.) of the UIAA stage to get a fallback page for.
         #[ruma_api(path)]
@@ -102,15 +102,15 @@ pub mod v3 {
 
     #[cfg(feature = "client")]
     impl ruma_common::api::IncomingResponse for Response {
-        type EndpointError = crate::Error;
+        type EndpointError = ruma_common::api::error::Error;
 
         fn try_from_http_response<T: AsRef<[u8]>>(
             response: http::Response<T>,
         ) -> Result<Self, ruma_common::api::error::FromHttpResponseError<Self::EndpointError>>
         {
             use ruma_common::api::{
-                error::{DeserializationError, FromHttpResponseError, HeaderDeserializationError},
                 EndpointError,
+                error::{DeserializationError, FromHttpResponseError, HeaderDeserializationError},
             };
 
             if response.status().as_u16() >= 400 {
@@ -138,18 +138,14 @@ pub mod v3 {
         }
     }
 
-    #[cfg(all(test, any(feature = "client", feature = "server")))]
-    mod tests {
-        use assert_matches2::assert_matches;
+    #[cfg(all(test, feature = "client"))]
+    mod tests_client {
+        use assert_matches2::assert_let;
         use http::header::{CONTENT_TYPE, LOCATION};
-        #[cfg(feature = "client")]
         use ruma_common::api::IncomingResponse;
-        #[cfg(feature = "server")]
-        use ruma_common::api::OutgoingResponse;
 
         use super::Response;
 
-        #[cfg(feature = "client")]
         #[test]
         fn incoming_redirect() {
             use super::Redirect;
@@ -161,11 +157,10 @@ pub mod v3 {
                 .unwrap();
 
             let response = Response::try_from_http_response(http_response).unwrap();
-            assert_matches!(response, Response::Redirect(Redirect { url }));
+            assert_let!(Response::Redirect(Redirect { url }) = response);
             assert_eq!(url, "http://localhost/redirect");
         }
 
-        #[cfg(feature = "client")]
         #[test]
         fn incoming_html() {
             use super::HtmlPage;
@@ -177,11 +172,18 @@ pub mod v3 {
                 .unwrap();
 
             let response = Response::try_from_http_response(http_response).unwrap();
-            assert_matches!(response, Response::Html(HtmlPage { body }));
+            assert_let!(Response::Html(HtmlPage { body }) = response);
             assert_eq!(body, b"<h1>My Page</h1>");
         }
+    }
 
-        #[cfg(feature = "server")]
+    #[cfg(all(test, feature = "server"))]
+    mod tests_server {
+        use http::header::{CONTENT_TYPE, LOCATION};
+        use ruma_common::api::OutgoingResponse;
+
+        use super::Response;
+
         #[test]
         fn outgoing_redirect() {
             let response = Response::redirect("http://localhost/redirect".to_owned());
@@ -196,7 +198,6 @@ pub mod v3 {
             assert!(http_response.into_body().is_empty());
         }
 
-        #[cfg(feature = "server")]
         #[test]
         fn outgoing_html() {
             let response = Response::html(b"<h1>My Page</h1>".to_vec());

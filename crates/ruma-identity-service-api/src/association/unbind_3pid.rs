@@ -5,24 +5,24 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#post_matrixidentityv23pidunbind
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#post_matrixidentityv23pidunbind
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedClientSecret, OwnedSessionId, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         thirdparty::Medium,
-        OwnedClientSecret, OwnedSessionId, OwnedUserId,
     };
     use serde::{Deserialize, Serialize};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/3pid/unbind",
         }
-    };
+    }
 
     /// Request type for the `unbind_3pid` endpoint.
     #[request]

@@ -3,12 +3,10 @@
 //! (De)serializable types for the [Matrix Server-Server API][federation-api].
 //! These types are used by server code.
 //!
-//! [federation-api]: https://spec.matrix.org/latest/server-server-api/
+//! [federation-api]: https://spec.matrix.org/v1.18/server-server-api/
 
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
-
-use std::fmt;
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod serde;
 
@@ -23,21 +21,11 @@ pub mod event;
 pub mod keys;
 pub mod membership;
 pub mod openid;
+pub mod policy;
 pub mod query;
 pub mod room;
 pub mod space;
 pub mod thirdparty;
 pub mod transactions;
 
-// Wrapper around `Box<str>` that cannot be used in a meaningful way outside of
-// this crate. Used for string enums because their `_Custom` variant can't be
-// truly private (only `#[doc(hidden)]`).
-#[doc(hidden)]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PrivOwnedStr(Box<str>);
-
-impl fmt::Debug for PrivOwnedStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
+ruma_common::priv_owned_str!();

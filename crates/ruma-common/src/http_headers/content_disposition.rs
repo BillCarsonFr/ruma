@@ -2,14 +2,13 @@
 
 use std::{fmt, ops::Deref, str::FromStr};
 
-use ruma_macros::{
-    AsRefStr, AsStrAsRefStr, DebugAsRefStr, DisplayAsRefStr, OrdAsRefStr, PartialOrdAsRefStr,
-};
+use ruma_macros::{AsRefStr, AsStrAsRefStr, DebugAsRefStr, DisplayAsRefStr, OrdAsRefStr};
 
 use super::{
     is_tchar, is_token, quote_ascii_string_if_required, rfc8187, sanitize_for_ascii_quoted_string,
     unescape_string,
 };
+use crate::PrivOwnedStr;
 
 /// The value of a `Content-Disposition` HTTP header.
 ///
@@ -105,16 +104,16 @@ impl TryFrom<&[u8]> for ContentDisposition {
         // Parse the parameters. We ignore parameters that fail to parse for maximum compatibility.
         while pos != value.len() {
             if let Some(param) = RawParam::parse_next(value, &mut pos) {
-                if param.name.eq_ignore_ascii_case(b"filename*") {
-                    if let Some(value) = param.decode_value() {
-                        filename_ext = Some(value);
-                        // We can stop parsing, this is the only parameter that we need.
-                        break;
-                    }
-                } else if param.name.eq_ignore_ascii_case(b"filename") {
-                    if let Some(value) = param.decode_value() {
-                        filename = Some(value);
-                    }
+                if param.name.eq_ignore_ascii_case(b"filename*")
+                    && let Some(value) = param.decode_value()
+                {
+                    filename_ext = Some(value);
+                    // We can stop parsing, this is the only parameter that we need.
+                    break;
+                } else if param.name.eq_ignore_ascii_case(b"filename")
+                    && let Some(value) = param.decode_value()
+                {
+                    filename = Some(value);
                 }
             }
         }
@@ -181,11 +180,7 @@ impl<'a> RawParam<'a> {
         } else {
             let s = String::from_utf8_lossy(self.value);
 
-            if self.is_quoted_string {
-                Some(unescape_string(&s))
-            } else {
-                Some(s.into_owned())
-            }
+            if self.is_quoted_string { Some(unescape_string(&s)) } else { Some(s.into_owned()) }
         }
     }
 }
@@ -340,16 +335,7 @@ pub enum ContentDispositionParseError {
 /// Comparisons with other string types are done case-insensitively.
 ///
 /// [Section 4.2 of RFC 6266]: https://datatracker.ietf.org/doc/html/rfc6266#section-4.2
-#[derive(
-    Clone,
-    Default,
-    AsRefStr,
-    DebugAsRefStr,
-    AsStrAsRefStr,
-    DisplayAsRefStr,
-    PartialOrdAsRefStr,
-    OrdAsRefStr,
-)]
+#[derive(Clone, Default, AsRefStr, DebugAsRefStr, AsStrAsRefStr, DisplayAsRefStr, OrdAsRefStr)]
 #[ruma_enum(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum ContentDispositionType {
@@ -363,7 +349,7 @@ pub enum ContentDispositionType {
     Attachment,
 
     #[doc(hidden)]
-    _Custom(TokenString),
+    _Custom(PrivOwnedStr),
 }
 
 impl ContentDispositionType {
@@ -380,7 +366,7 @@ impl From<TokenString> for ContentDispositionType {
         } else if value.eq_ignore_ascii_case("attachment") {
             Self::Attachment
         } else {
-            Self::_Custom(value)
+            Self::_Custom(PrivOwnedStr(value.0))
         }
     }
 }
@@ -394,7 +380,7 @@ impl<'a> TryFrom<&'a [u8]> for ContentDispositionType {
         } else if value.eq_ignore_ascii_case(b"attachment") {
             Ok(Self::Attachment)
         } else {
-            TokenString::try_from(value).map(Self::_Custom)
+            TokenString::try_from(value).map(Into::into)
         }
     }
 }
@@ -432,16 +418,7 @@ impl<'a> PartialEq<&'a str> for ContentDispositionType {
 /// This is a string that can only contain a limited character set.
 ///
 /// [RFC 7230 Section 3.2.6]: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2.6
-#[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    DebugAsRefStr,
-    AsStrAsRefStr,
-    DisplayAsRefStr,
-    PartialOrdAsRefStr,
-    OrdAsRefStr,
-)]
+#[derive(Clone, PartialEq, Eq, DebugAsRefStr, AsStrAsRefStr, DisplayAsRefStr, OrdAsRefStr)]
 pub struct TokenString(Box<str>);
 
 impl TokenString {

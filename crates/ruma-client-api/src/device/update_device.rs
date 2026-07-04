@@ -1,18 +1,21 @@
 //! `PUT /_matrix/client/*/devices/{deviceId}`
 //!
-//! Update metadata for a device.
+//! Update metadata for a device, or create a new device.
+//!
+//! Only application services can use this endpoint to create new devices.
 
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3devicesdeviceid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3devicesdeviceid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedDeviceId,
+        OwnedDeviceId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
@@ -20,12 +23,12 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/devices/{device_id}",
             1.1 => "/_matrix/client/v3/devices/{device_id}",
         }
-    };
+    }
 
     /// Request type for the `update_device` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
-        /// The device to update.
+        /// The device to update or create.
         #[ruma_api(path)]
         pub device_id: OwnedDeviceId,
 
@@ -37,7 +40,7 @@ pub mod v3 {
     }
 
     /// Response type for the `update_device` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

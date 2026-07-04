@@ -5,25 +5,26 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#post_matrixidentityv2lookup
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#post_matrixidentityv2lookup
 
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedUserId,
+        OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::lookup::IdentifierHashingAlgorithm;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/lookup",
         }
-    };
+    }
 
     /// Request type for the `lookup_3pid` endpoint.
     #[request]

@@ -4,11 +4,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ruma_common::{serde::StringEnum, OwnedMxcUri, OwnedRoomId};
+use ruma_common::{OwnedMxcUri, OwnedRoomId, serde::StringEnum};
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
 
-use crate::{room::ImageInfo, PrivOwnedStr};
+use crate::{PrivOwnedStr, room::ImageInfo};
 
 /// The content of an `im.ponies.room_emotes` event,
 /// the unstable version of `m.image_pack` in room state events.
@@ -124,7 +124,7 @@ impl PackInfo {
 
 /// Usages for either an image pack or an individual image.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum PackUsage {

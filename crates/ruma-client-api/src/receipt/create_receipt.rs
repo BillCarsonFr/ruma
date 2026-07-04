@@ -5,19 +5,19 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3roomsroomidreceiptreceipttypeeventid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3roomsroomidreceiptreceipttypeeventid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata,
-        serde::{OrdAsRefStr, PartialEqAsRefStr, PartialOrdAsRefStr, StringEnum},
         OwnedEventId, OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
+        serde::StringEnum,
     };
     use ruma_events::receipt::ReceiptThread;
 
     use crate::PrivOwnedStr;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -25,10 +25,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/receipt/{receipt_type}/{event_id}",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/receipt/{receipt_type}/{event_id}",
         }
-    };
+    }
 
     /// Request type for the `create_receipt` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room in which to send the event.
         #[ruma_api(path)]
@@ -57,7 +57,7 @@ pub mod v3 {
     }
 
     /// Response type for the `create_receipt` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 
@@ -81,7 +81,7 @@ pub mod v3 {
 
     /// The type of receipt.
     #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-    #[derive(Clone, PartialOrdAsRefStr, OrdAsRefStr, PartialEqAsRefStr, Eq, StringEnum)]
+    #[derive(Clone, StringEnum)]
     #[non_exhaustive]
     pub enum ReceiptType {
         /// A [public read receipt].
@@ -90,7 +90,7 @@ pub mod v3 {
         ///
         /// This receipt is federated to other users.
         ///
-        /// [public read receipt]: https://spec.matrix.org/latest/client-server-api/#receipts
+        /// [public read receipt]: https://spec.matrix.org/v1.18/client-server-api/#receipts
         #[ruma_enum(rename = "m.read")]
         Read,
 
@@ -101,7 +101,7 @@ pub mod v3 {
         /// This read receipt is not federated so only the user and their homeserver
         /// are aware of it.
         ///
-        /// [private read receipt]: https://spec.matrix.org/latest/client-server-api/#private-read-receipts
+        /// [private read receipt]: https://spec.matrix.org/v1.18/client-server-api/#private-read-receipts
         #[ruma_enum(rename = "m.read.private")]
         ReadPrivate,
 
@@ -112,7 +112,7 @@ pub mod v3 {
         /// This is actually not a receipt, but a piece of room account data. It is
         /// provided here for convenience.
         ///
-        /// [fully read marker]: https://spec.matrix.org/latest/client-server-api/#fully-read-markers
+        /// [fully read marker]: https://spec.matrix.org/v1.18/client-server-api/#fully-read-markers
         #[ruma_enum(rename = "m.fully_read")]
         FullyRead,
 

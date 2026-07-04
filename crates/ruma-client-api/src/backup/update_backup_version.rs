@@ -5,17 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3room_keysversionversion
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3room_keysversionversion
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
     };
 
     use crate::backup::BackupAlgorithm;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: true,
         authentication: AccessToken,
@@ -23,10 +23,10 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/room_keys/version/{version}",
             1.1 => "/_matrix/client/v3/room_keys/version/{version}",
         }
-    };
+    }
 
     /// Request type for the `update_backup_version` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The backup version.
         #[ruma_api(path)]
@@ -38,7 +38,7 @@ pub mod v3 {
     }
 
     /// Response type for the `update_backup_version` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

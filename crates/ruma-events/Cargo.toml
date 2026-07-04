@@ -1,20 +1,19 @@
 [package]
 name = "ruma-events"
-version = "0.31.0"
+version = "0.34.0"
 description = "Serializable types for the events in the Matrix specification."
 homepage = "https://ruma.dev/"
 keywords = ["matrix", "chat", "messaging", "ruma"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ruma/ruma"
-edition = "2021"
+edition = "2024"
 rust-version = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
 
 [features]
-canonical-json = ["ruma-common/canonical-json"]
 html = ["dep:ruma-html"]
 markdown = ["dep:pulldown-cmark"]
 unstable-msc1767 = []
@@ -23,6 +22,7 @@ unstable-msc2545 = []
 unstable-msc2747 = []
 unstable-msc2867 = []
 unstable-msc3061 = []
+unstable-msc3230 = []
 unstable-msc3245 = ["unstable-msc3246"]
 # Support the m.room.message fallback fields from the first version of MSC3245,
 # implemented in Element Web and documented at
@@ -31,7 +31,7 @@ unstable-msc3245-v1-compat = []
 unstable-msc3246 = ["unstable-msc3927"]
 unstable-msc3381 = ["unstable-msc1767"]
 unstable-msc3401 = []
-unstable-msc3414 = []
+unstable-msc3417 = ["ruma-common/unstable-msc3417"]
 unstable-msc3488 = ["unstable-msc1767"]
 unstable-msc3489 = ["unstable-msc3488"]
 unstable-msc3551 = ["unstable-msc3956"]
@@ -45,16 +45,21 @@ unstable-msc3956 = ["unstable-msc1767"]
 unstable-msc4075 = ["unstable-msc3401"]
 unstable-msc4095 = []
 unstable-msc4171 = []
-unstable-msc4230 = []
 unstable-msc4268 = []
 unstable-msc4274 = []
 unstable-msc4278 = []
-unstable-msc4319 = []
+unstable-msc4293 = []
 unstable-msc4310 = []
+unstable-msc4319 = []
 unstable-msc4334 = ["dep:language-tags"]
 unstable-msc4359 = []
+unstable-msc4362 = []
+unstable-msc4380 = []
+unstable-msc4385 = []
+unstable-msc4471 = []
 # Sticky Events
 unstable-msc4354 = []
+unstable-uniffi = ["dep:uniffi"]
 
 # Allow some mandatory fields to be missing, defaulting them to an empty string
 # in deserialization.
@@ -79,26 +84,26 @@ compat-lax-room-create-deser = []
 # deserialization fails.
 compat-lax-room-topic-deser = []
 
+# Private feature used for benchmarks.
+__criterion = ["dep:criterion"]
+
 [dependencies]
 as_variant = { workspace = true }
 indexmap = { version = "2.0.0", features = ["serde"] }
 js_int = { workspace = true, features = ["serde"] }
 js_option = { workspace = true }
 language-tags = { workspace = true, optional = true }
-percent-encoding = "2.1.0"
 pulldown-cmark = { version = "0.13.0", optional = true, default-features = false, features = ["html"] }
-regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
 ruma-common = { workspace = true }
 ruma-html = { workspace = true, optional = true }
-ruma-identifiers-validation = { workspace = true }
 ruma-macros = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["raw_value"] }
 thiserror = { workspace = true }
 tracing = { workspace = true, features = ["attributes"] }
-url = { workspace = true }
+uniffi = { workspace = true, optional = true }
 web-time = { workspace = true }
-wildmatch = "2.0.0"
+wildmatch = { workspace = true }
 zeroize = { workspace = true }
 
 # dev-dependencies can't be optional, so this is a regular dependency
@@ -107,14 +112,13 @@ criterion = { workspace = true, optional = true }
 [dev-dependencies]
 assert_matches2 = { workspace = true }
 assign = { workspace = true }
-http = { workspace = true }
 maplit = { workspace = true }
 trybuild = "1.0.71"
 
 [[bench]]
 name = "event_deserialize"
 harness = false
-required-features = ["criterion"]
+required-features = ["__criterion"]
 
 [lints]
 workspace = true

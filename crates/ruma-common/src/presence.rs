@@ -1,12 +1,12 @@
 //! Common types for the [presence module][presence].
 //!
-//! [presence]: https://spec.matrix.org/latest/client-server-api/#presence
+//! [presence]: https://spec.matrix.org/v1.18/client-server-api/#presence
 
-use crate::{serde::StringEnum, PrivOwnedStr};
+use crate::{PrivOwnedStr, serde::StringEnum};
 
 /// A description of a user's connectivity and availability for chat.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, Default, PartialEq, Eq, StringEnum)]
+#[derive(Clone, Default, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum PresenceState {

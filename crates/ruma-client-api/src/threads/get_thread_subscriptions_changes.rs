@@ -11,27 +11,31 @@ pub mod unstable {
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Direction, Metadata},
-        metadata, OwnedEventId, OwnedRoomId,
+        OwnedEventId, OwnedRoomId,
+        api::{Direction, auth_scheme::AccessToken, request, response},
+        metadata,
     };
     use serde::{Deserialize, Serialize};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
         history: {
             unstable("org.matrix.msc4308") => "/_matrix/client/unstable/io.element.msc4308/thread_subscriptions",
         }
-    };
+    }
 
     /// Request type for the `get_thread_subscriptions_changes` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The direction to use for pagination.
         ///
-        /// Always `b`ackwards at the time of implementation (2025-08-21).
+        /// Only `Direction::Backward` is meant to be supported, which is why this field is private
+        /// for now (as of 2025-08-21).
         #[ruma_api(query)]
+        // Because this field is private, it is never read.
+        #[allow(dead_code)]
         dir: Direction,
 
         /// A token to continue pagination from.
@@ -98,7 +102,7 @@ pub mod unstable {
     }
 
     /// Response type for the `get_thread_subscriptions_changes` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// New thread subscriptions.
         #[serde(skip_serializing_if = "BTreeMap::is_empty")]

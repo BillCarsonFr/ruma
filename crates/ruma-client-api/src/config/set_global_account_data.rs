@@ -5,20 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3useruseridaccount_datatype
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3useruseridaccount_datatype
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedUserId,
     };
     use ruma_events::{
         AnyGlobalAccountDataEventContent, GlobalAccountDataEventContent, GlobalAccountDataEventType,
     };
     use serde_json::value::to_raw_value as to_raw_json_value;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/user/{user_id}/account_data/{event_type}",
             1.1 => "/_matrix/client/v3/user/{user_id}/account_data/{event_type}",
         }
-    };
+    }
 
     /// Request type for the `set_global_account_data` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The ID of the user to set account_data for.
         ///
@@ -51,7 +51,7 @@ pub mod v3 {
     }
 
     /// Response type for the `set_global_account_data` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

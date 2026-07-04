@@ -13,9 +13,10 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use serde_json::from_str as from_json_str;
+use xshell::Shell;
 
 // Keep in sync with version in `rust-toolchain.toml` and `.github/workflows/ci.yml`
-const NIGHTLY: &str = "nightly-2025-08-08";
+const NIGHTLY: &str = "nightly-2026-06-18";
 
 mod bench;
 mod cargo;
@@ -23,6 +24,8 @@ mod ci;
 mod doc;
 #[cfg(feature = "default")]
 mod release;
+mod semver;
+mod spec_links;
 #[cfg(feature = "default")]
 mod util;
 
@@ -32,7 +35,8 @@ use ci::{CiArgs, CiTask};
 use doc::DocTask;
 #[cfg(feature = "default")]
 use release::{ReleaseArgs, ReleaseTask};
-use xshell::Shell;
+use semver::{SemverArgs, SemverTask};
+use spec_links::{SpecLinksArgs, SpecLinksTask};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -54,6 +58,10 @@ enum Command {
     Release(ReleaseArgs),
     /// Run benchmarks
     Bench(BenchTask),
+    /// Run semver checks
+    Semver(SemverArgs),
+    /// Interact with spec links
+    SpecLinks(SpecLinksArgs),
 }
 
 fn main() -> Result<()> {
@@ -69,6 +77,14 @@ fn main() -> Result<()> {
             task.run()
         }
         Command::Bench(bench) => bench.run(),
+        Command::Semver(args) => {
+            let semver = SemverTask::new(args.cmd, args.no_color)?;
+            semver.run()
+        }
+        Command::SpecLinks(args) => {
+            let spec_links = SpecLinksTask::new(args.cmd)?;
+            spec_links.run()
+        }
     }
 }
 
@@ -89,6 +105,11 @@ impl Metadata {
     /// Find the package with the given name.
     pub fn find_package(&self, name: &str) -> Option<&Package> {
         self.packages.iter().find(|p| p.name == name)
+    }
+
+    /// Path to the `crates` directory in the workspace.
+    pub(crate) fn crates_path(&self) -> PathBuf {
+        self.workspace_root.join("crates")
     }
 }
 

@@ -6,22 +6,22 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#get_matrixidentityv2pubkeyisvalid
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#get_matrixidentityv2pubkeyisvalid
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::NoAccessToken, request, response},
         metadata,
         third_party_invite::IdentityServerBase64PublicKey,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/pubkey/isvalid",
         }
-    };
+    }
 
     /// Request type for the `check_public_key_validity` endpoint.
     #[request]

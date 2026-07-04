@@ -5,16 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3account3pidbind
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3account3pidbind
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedClientSecret, OwnedSessionId,
+        OwnedClientSecret, OwnedSessionId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
     use crate::account::IdentityServerInfo;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -22,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/account/3pid/bind",
             1.1 => "/_matrix/client/v3/account/3pid/bind",
         }
-    };
+    }
 
     /// Request type for the `bind_3pid` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// Client-generated secret string used to protect this session.
         pub client_secret: OwnedClientSecret,
@@ -40,7 +41,7 @@ pub mod v3 {
     }
 
     /// Response type for the `bind_3pid` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

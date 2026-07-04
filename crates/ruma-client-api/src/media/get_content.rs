@@ -5,32 +5,31 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixmediav3downloadservernamemediaid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixmediav3downloadservernamemediaid
 
     use std::time::Duration;
 
     use http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
     use ruma_common::{
-        api::{request, response, Metadata},
-        http_headers::ContentDisposition,
-        metadata, IdParseError, MxcUri, OwnedServerName,
+        IdParseError, MxcUri, OwnedServerName,
+        api::{auth_scheme::NoAccessToken, request, response},
+        http_headers::{CROSS_ORIGIN_RESOURCE_POLICY, ContentDisposition},
+        metadata,
     };
 
-    use crate::http_headers::CROSS_ORIGIN_RESOURCE_POLICY;
-
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             1.0 => "/_matrix/media/r0/download/{server_name}/{media_id}",
             1.1 => "/_matrix/media/v3/download/{server_name}/{media_id}",
             1.11 => deprecated,
         }
-    };
+    }
 
     /// Request type for the `get_media_content` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[deprecated = "\
         Since Matrix 1.11, clients should use `authenticated_media::get_content::v1::Request` \
         instead if the homeserver supports it.\
@@ -76,7 +75,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_media_content` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The content that was previously uploaded.
         #[ruma_api(raw_body)]

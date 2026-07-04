@@ -1,6 +1,6 @@
 //! A URI that should be a Matrix-spec compliant [MXC URI].
 //!
-//! [MXC URI]: https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris
+//! [MXC URI]: https://spec.matrix.org/v1.18/client-server-api/#matrix-content-mxc-uris
 
 use std::num::NonZeroU8;
 
@@ -13,7 +13,7 @@ type Result<T, E = MxcUriError> = std::result::Result<T, E>;
 
 /// A URI that should be a Matrix-spec compliant [MXC URI].
 ///
-/// [MXC URI]: https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris
+/// [MXC URI]: https://spec.matrix.org/v1.18/client-server-api/#matrix-content-mxc-uris
 #[repr(transparent)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, IdDst)]
 pub struct MxcUri(str);
@@ -34,7 +34,7 @@ impl MxcUri {
     pub fn parts(&self) -> Result<(&ServerName, &str)> {
         self.extract_slash_idx().map(|idx| {
             (
-                ServerName::from_borrowed(&self.as_str()[6..idx.get() as usize]),
+                ServerName::from_borrowed_unchecked(&self.as_str()[6..idx.get() as usize]),
                 &self.as_str()[idx.get() as usize + 1..],
             )
         })
@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn parse_mxc_uri() {
-        let mxc = Box::<MxcUri>::from("mxc://127.0.0.1/asd32asdfasdsd");
+        let mxc = <&MxcUri>::from("mxc://127.0.0.1/asd32asdfasdsd");
 
         assert!(mxc.is_valid());
         assert_eq!(
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn parse_mxc_uri_without_media_id() {
-        let mxc = Box::<MxcUri>::from("mxc://127.0.0.1");
+        let mxc = <&MxcUri>::from("mxc://127.0.0.1");
 
         assert!(!mxc.is_valid());
         assert_eq!(mxc.parts(), Err(MxcUriError::MissingSlash));
@@ -85,13 +85,13 @@ mod tests {
 
     #[test]
     fn parse_mxc_uri_without_protocol() {
-        assert!(!Box::<MxcUri>::from("127.0.0.1/asd32asdfasdsd").is_valid());
+        assert!(!<&MxcUri>::from("127.0.0.1/asd32asdfasdsd").is_valid());
     }
 
     #[test]
     fn serialize_mxc_uri() {
         assert_eq!(
-            serde_json::to_string(&Box::<MxcUri>::from("mxc://server/1234id"))
+            serde_json::to_string(<&MxcUri>::from("mxc://server/1234id"))
                 .expect("Failed to convert MxcUri to JSON."),
             r#""mxc://server/1234id""#
         );

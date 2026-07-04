@@ -5,14 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3useruseridroomsroomidtagstag
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#put_matrixclientv3useruseridroomsroomidtagstag
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId, OwnedUserId,
+        OwnedRoomId, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: DELETE,
         rate_limited: false,
         authentication: AccessToken,
@@ -20,10 +21,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/user/{user_id}/rooms/{room_id}/tags/{tag}",
             1.1 => "/_matrix/client/v3/user/{user_id}/rooms/{room_id}/tags/{tag}",
         }
-    };
+    }
 
     /// Request type for the `delete_tag` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The user whose tag will be deleted.
         #[ruma_api(path)]
@@ -39,7 +40,7 @@ pub mod v3 {
     }
 
     /// Response type for the `delete_tag` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

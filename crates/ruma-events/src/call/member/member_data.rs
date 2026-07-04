@@ -12,6 +12,8 @@ use tracing::warn;
 
 use super::focus::{ActiveFocus, ActiveLivekitFocus, Focus};
 use crate::PrivOwnedStr;
+#[cfg(feature = "unstable-msc4075")]
+use crate::rtc::notification::CallIntent;
 
 /// The data object that contains the information for one membership.
 ///
@@ -72,6 +74,13 @@ impl MembershipData<'_> {
         }
     }
 
+    /// The current call intent (audio or video).
+    #[cfg(feature = "unstable-msc4075")]
+    pub fn call_intent(&self) -> Option<&CallIntent> {
+        as_variant!(self.application(), Application::Call)
+            .and_then(|call| call.call_intent.as_ref())
+    }
+
     /// The application of the membership is "m.call" and the scope is "m.room".
     pub fn is_room_call(&self) -> bool {
         as_variant!(self.application(), Application::Call)
@@ -114,7 +123,9 @@ impl MembershipData<'_> {
         } else {
             // This should not be reached since we only allow events that have copied over
             // the origin server ts. `set_created_ts_if_none`
-            warn!("Encountered a Call Member state event where the expire_ts could not be constructed.");
+            warn!(
+                "Encountered a Call Member state event where the expire_ts could not be constructed."
+            );
             false
         }
     }
@@ -299,6 +310,11 @@ pub struct CallApplicationContent {
 
     /// Who owns/joins/controls (can modify) the call.
     pub scope: CallScope,
+
+    /// The call intent.
+    #[serde(rename = "m.call.intent", default, skip_serializing_if = "Option::is_none")]
+    #[cfg(feature = "unstable-msc4075")]
+    pub call_intent: Option<CallIntent>,
 }
 
 impl CallApplicationContent {
@@ -310,15 +326,33 @@ impl CallApplicationContent {
     ///   the same call. Does not need to be a uuid. `""` is used for room scoped calls.
     /// * `scope` - Who owns/joins/controls (can modify) the call.
     pub fn new(call_id: String, scope: CallScope) -> Self {
-        Self { call_id, scope }
+        Self {
+            call_id,
+            scope,
+            #[cfg(feature = "unstable-msc4075")]
+            call_intent: None,
+        }
+    }
+
+    /// Initialize a [`CallApplicationContent`] with a call intent.
+    ///
+    /// # Arguments
+    ///
+    /// * `call_id` - An identifier for calls. All members using the same `call_id` will end up in
+    ///   the same call. Does not need to be a uuid. `""` is used for room scoped calls.
+    /// * `scope` - Who owns/joins/controls (can modify) the call.
+    /// * `call_intent` - Indication of whether the call is an "audio" or "video"(+audio) call.
+    #[cfg(feature = "unstable-msc4075")]
+    pub fn new_with_intent(call_id: String, scope: CallScope, call_intent: CallIntent) -> Self {
+        Self { call_id, scope, call_intent: Some(call_intent) }
     }
 }
 
 /// The call scope defines different call ownership models.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
-#[ruma_enum(rename_all = "m.snake_case")]
+#[ruma_enum(rename_all(prefix = "m.", rule = "snake_case"))]
 pub enum CallScope {
     /// A call which every user of a room can join and create.
     ///

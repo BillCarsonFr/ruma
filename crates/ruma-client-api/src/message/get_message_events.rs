@@ -5,20 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomidmessages
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3roomsroomidmessages
 
-    use js_int::{uint, UInt};
+    use js_int::{UInt, uint};
     use ruma_common::{
-        api::{request, response, Direction, Metadata},
+        OwnedRoomId,
+        api::{Direction, auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedRoomId,
     };
     use ruma_events::{AnyStateEvent, AnyTimelineEvent};
 
     use crate::filter::RoomEventFilter;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/messages",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/messages",
         }
-    };
+    }
 
     /// Request type for the `get_message_events` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to get events from.
         #[ruma_api(path)]
@@ -77,7 +77,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_message_events` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// The token the pagination starts from.
@@ -165,6 +165,7 @@ pub mod v3 {
         uint!(10)
     }
 
+    #[cfg(feature = "client")]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_default_limit(val: &UInt) -> bool {
         *val == default_limit()
@@ -172,9 +173,14 @@ pub mod v3 {
 
     #[cfg(all(test, feature = "client"))]
     mod tests {
+        use std::borrow::Cow;
+
         use js_int::uint;
         use ruma_common::{
-            api::{Direction, MatrixVersion, OutgoingRequest, SendAccessToken, SupportedVersions},
+            api::{
+                Direction, MatrixVersion, OutgoingRequest, SupportedVersions,
+                auth_scheme::SendAccessToken,
+            },
             owned_room_id,
         };
 
@@ -184,7 +190,7 @@ pub mod v3 {
         #[test]
         fn serialize_some_room_event_filter() {
             let room_id = owned_room_id!("!roomid:example.org");
-            let rooms = vec![room_id.to_owned()];
+            let rooms = vec![room_id.clone()];
             let filter = RoomEventFilter {
                 lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: true },
                 rooms: Some(rooms),
@@ -213,7 +219,7 @@ pub mod v3 {
                 .try_into_http_request(
                     "https://homeserver.tld",
                     SendAccessToken::IfRequired("auth_tok"),
-                    &supported,
+                    Cow::Owned(supported),
                 )
                 .unwrap();
             assert_eq!(
@@ -246,7 +252,7 @@ pub mod v3 {
                 .try_into_http_request::<Vec<u8>>(
                     "https://homeserver.tld",
                     SendAccessToken::IfRequired("auth_tok"),
-                    &supported,
+                    Cow::Owned(supported),
                 )
                 .unwrap();
             assert_eq!("from=token&to=token2&dir=b&limit=0", request.uri().query().unwrap(),);

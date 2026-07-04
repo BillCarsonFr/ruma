@@ -5,14 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3roomsroomidunban
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3roomsroomidunban
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId, OwnedUserId,
+        OwnedRoomId, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
@@ -20,10 +21,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/unban",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/unban",
         }
-    };
+    }
 
     /// Request type for the `unban_user` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to unban the user from.
         #[ruma_api(path)]
@@ -38,7 +39,7 @@ pub mod v3 {
     }
 
     /// Response type for the `unban_user` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

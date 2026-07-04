@@ -1,25 +1,24 @@
 //! `/v1/` ([spec])
 //!
-//! [spec]: https://spec.matrix.org/latest/server-server-api/#put_matrixfederationv1inviteroomideventid
+//! [spec]: https://spec.matrix.org/v1.18/server-server-api/#put_matrixfederationv1inviteroomideventid
 
 use ruma_common::{
-    api::{request, response, Metadata},
-    metadata, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedServerName, OwnedUserId,
+    MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedServerName, OwnedUserId,
+    api::{request, response},
+    metadata,
 };
-use ruma_events::{room::member::RoomMemberEventContent, StateEventType};
+use ruma_events::{StateEventType, room::member::RoomMemberEventContent};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue as RawJsonValue;
 
-use crate::membership::RawStrippedState;
+use crate::{authentication::ServerSignatures, membership::RawStrippedState};
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: PUT,
     rate_limited: false,
     authentication: ServerSignatures,
-    history: {
-        1.0 => "/_matrix/federation/v1/invite/{room_id}/{event_id}",
-    }
-};
+    path: "/_matrix/federation/v1/invite/{room_id}/{event_id}",
+}
 
 /// Request type for the `create_invite` endpoint.
 #[request]

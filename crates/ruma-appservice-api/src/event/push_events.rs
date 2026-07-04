@@ -5,7 +5,7 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/application-service-api/#put_matrixappv1transactionstxnid
+    //! [spec]: https://spec.matrix.org/v1.18/application-service-api/#put_matrixappv1transactionstxnid
 
     use std::borrow::Cow;
     #[cfg(feature = "unstable-msc3202")]
@@ -14,31 +14,31 @@ pub mod v1 {
     #[cfg(feature = "unstable-msc3202")]
     use js_int::UInt;
     #[cfg(feature = "unstable-msc3202")]
-    use ruma_common::OwnedUserId;
+    use ruma_common::OneTimeKeyAlgorithm;
+    #[cfg(any(feature = "unstable-msc3202", feature = "unstable-msc4203"))]
+    use ruma_common::{OwnedDeviceId, OwnedUserId};
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata,
-        serde::{from_raw_json_value, JsonObject, Raw},
         OwnedTransactionId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
+        serde::{JsonObject, Raw, from_raw_json_value},
     };
-    #[cfg(feature = "unstable-msc3202")]
-    use ruma_common::{OneTimeKeyAlgorithm, OwnedDeviceId};
     #[cfg(feature = "unstable-msc4203")]
-    use ruma_events::AnyToDeviceEvent;
+    use ruma_common::{UserId, serde::JsonCastable};
     use ruma_events::{
-        presence::PresenceEvent, receipt::ReceiptEvent, typing::TypingEvent, AnyTimelineEvent,
+        AnyTimelineEvent, presence::PresenceEvent, receipt::ReceiptEvent, typing::TypingEvent,
     };
+    #[cfg(feature = "unstable-msc4203")]
+    use ruma_events::{AnyToDeviceEvent, AnyToDeviceEventContent, ToDeviceEventType};
     use serde::{Deserialize, Deserializer, Serialize};
     use serde_json::value::{RawValue as RawJsonValue, Value as JsonValue};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
         authentication: AccessToken,
-        history: {
-            1.0 => "/_matrix/app/v1/transactions/{txn_id}",
-        }
-    };
+        path: "/_matrix/app/v1/transactions/{txn_id}",
+    }
 
     /// Request type for the `push_events` endpoint.
     #[request]
@@ -94,7 +94,7 @@ pub mod v1 {
             skip_serializing_if = "<[_]>::is_empty",
             rename = "de.sorunome.msc2409.to_device"
         )]
-        pub to_device: Vec<Raw<AnyToDeviceEvent>>,
+        pub to_device: Vec<Raw<AnyAppserviceToDeviceEvent>>,
     }
 
     /// Response type for the `push_events` endpoint.
@@ -253,22 +253,94 @@ pub mod v1 {
         }
     }
 
+    /// An event sent using send-to-device messaging with additional fields when pushed to an
+    /// application service.
+    #[derive(Clone, Debug)]
+    #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    #[cfg(feature = "unstable-msc4203")]
+    pub struct AnyAppserviceToDeviceEvent {
+        /// The to-device event.
+        pub event: AnyToDeviceEvent,
+
+        /// The fully-qualified user ID of the intended recipient.
+        pub to_user_id: OwnedUserId,
+
+        /// The device ID of the intended recipient.
+        pub to_device_id: OwnedDeviceId,
+    }
+
+    #[cfg(feature = "unstable-msc4203")]
+    impl AnyAppserviceToDeviceEvent {
+        /// Construct a new `AnyAppserviceToDeviceEvent` with the given event and recipient
+        /// information.
+        pub fn new(
+            event: AnyToDeviceEvent,
+            to_user_id: OwnedUserId,
+            to_device_id: OwnedDeviceId,
+        ) -> Self {
+            Self { event, to_user_id, to_device_id }
+        }
+
+        /// The fully-qualified ID of the user who sent this event.
+        pub fn sender(&self) -> &UserId {
+            self.event.sender()
+        }
+
+        /// The event type of the to-device event.
+        pub fn event_type(&self) -> ToDeviceEventType {
+            self.event.event_type()
+        }
+
+        /// The content of the to-device event.
+        pub fn content(&self) -> AnyToDeviceEventContent {
+            self.event.content()
+        }
+    }
+
+    #[cfg(feature = "unstable-msc4203")]
+    impl<'de> Deserialize<'de> for AnyAppserviceToDeviceEvent {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct AppserviceFields {
+                to_user_id: OwnedUserId,
+                to_device_id: OwnedDeviceId,
+            }
+
+            let json = Box::<RawJsonValue>::deserialize(deserializer)?;
+
+            let event = from_raw_json_value(&json)?;
+
+            let AppserviceFields { to_user_id, to_device_id } = from_raw_json_value(&json)?;
+
+            Ok(AnyAppserviceToDeviceEvent::new(event, to_user_id, to_device_id))
+        }
+    }
+
+    #[cfg(feature = "unstable-msc4203")]
+    impl JsonCastable<JsonObject> for AnyAppserviceToDeviceEvent {}
+    #[cfg(feature = "unstable-msc4203")]
+    impl JsonCastable<AnyToDeviceEvent> for AnyAppserviceToDeviceEvent {}
+
     #[cfg(test)]
     mod tests {
-        use assert_matches2::assert_matches;
+        use assert_matches2::assert_let;
         use js_int::uint;
-        use ruma_common::{event_id, room_id, user_id, MilliSecondsSinceUnixEpoch};
+        use ruma_common::{
+            MilliSecondsSinceUnixEpoch, canonical_json::assert_to_canonical_json_eq, event_id,
+            room_id, user_id,
+        };
         use ruma_events::receipt::ReceiptType;
-        use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+        use serde_json::{from_value as from_json_value, json};
 
         use super::EphemeralData;
 
         #[cfg(feature = "client")]
         #[test]
         fn request_contains_events_field() {
-            use ruma_common::api::{
-                MatrixVersion, OutgoingRequest, SendAccessToken, SupportedVersions,
-            };
+            use ruma_common::api::{OutgoingRequest, auth_scheme::SendAccessToken};
 
             let dummy_event_json = json!({
                 "type": "m.room.message",
@@ -283,16 +355,12 @@ pub mod v1 {
             });
             let dummy_event = from_json_value(dummy_event_json.clone()).unwrap();
             let events = vec![dummy_event];
-            let supported = SupportedVersions {
-                versions: [MatrixVersion::V1_1].into(),
-                features: Default::default(),
-            };
 
             let req = super::Request::new("any_txn_id".into(), events)
                 .try_into_http_request::<Vec<u8>>(
                     "https://homeserver.tld",
                     SendAccessToken::IfRequired("auth_tok"),
-                    &supported,
+                    (),
                 )
                 .unwrap();
             let json_body: serde_json::Value = serde_json::from_slice(req.body()).unwrap();
@@ -323,12 +391,11 @@ pub mod v1 {
             });
 
             let data = from_json_value::<EphemeralData>(typing_json.clone()).unwrap();
-            assert_matches!(&data, EphemeralData::Typing(typing));
+            assert_let!(EphemeralData::Typing(typing) = &data);
             assert_eq!(typing.room_id, room_id);
             assert_eq!(typing.content.user_ids, &[user_id.to_owned()]);
 
-            let serialized_data = to_json_value(data).unwrap();
-            assert_eq!(serialized_data, typing_json);
+            assert_to_canonical_json_eq!(data, typing_json);
 
             // Test m.receipt serde.
             let receipt_json = json!({
@@ -346,15 +413,14 @@ pub mod v1 {
             });
 
             let data = from_json_value::<EphemeralData>(receipt_json.clone()).unwrap();
-            assert_matches!(&data, EphemeralData::Receipt(receipt));
+            assert_let!(EphemeralData::Receipt(receipt) = &data);
             assert_eq!(receipt.room_id, room_id);
             let event_receipts = receipt.content.get(event_id).unwrap();
             let event_read_receipts = event_receipts.get(&ReceiptType::Read).unwrap();
             let event_user_read_receipt = event_read_receipts.get(user_id).unwrap();
             assert_eq!(event_user_read_receipt.ts, Some(MilliSecondsSinceUnixEpoch(uint!(453))));
 
-            let serialized_data = to_json_value(data).unwrap();
-            assert_eq!(serialized_data, receipt_json);
+            assert_to_canonical_json_eq!(data, receipt_json);
 
             // Test m.presence serde.
             let presence_json = json!({
@@ -370,12 +436,11 @@ pub mod v1 {
             });
 
             let data = from_json_value::<EphemeralData>(presence_json.clone()).unwrap();
-            assert_matches!(&data, EphemeralData::Presence(presence));
+            assert_let!(EphemeralData::Presence(presence) = &data);
             assert_eq!(presence.sender, user_id);
             assert_eq!(presence.content.currently_active, Some(false));
 
-            let serialized_data = to_json_value(data).unwrap();
-            assert_eq!(serialized_data, presence_json);
+            assert_to_canonical_json_eq!(data, presence_json);
 
             // Test custom serde.
             let custom_json = json!({
@@ -388,8 +453,37 @@ pub mod v1 {
 
             let data = from_json_value::<EphemeralData>(custom_json.clone()).unwrap();
 
-            let serialized_data = to_json_value(data).unwrap();
-            assert_eq!(serialized_data, custom_json);
+            assert_to_canonical_json_eq!(data, custom_json);
+        }
+
+        #[test]
+        #[cfg(feature = "unstable-msc4203")]
+        fn serde_any_appservice_to_device_event() {
+            use ruma_common::{device_id, user_id};
+
+            use super::AnyAppserviceToDeviceEvent;
+
+            let event_json = json!({
+                "type": "m.key.verification.request",
+                "sender": "@alice:example.org",
+                "content": {
+                    "from_device": "AliceDevice2",
+                    "methods": [
+                        "m.sas.v1"
+                    ],
+                    "timestamp": 1_559_598_944_869_i64,
+                    "transaction_id": "S0meUniqueAndOpaqueString"
+                },
+                "to_user_id": "@bob:example.org",
+                "to_device_id": "DEVICEID"
+            });
+
+            // Test deserialization
+            let event = from_json_value::<AnyAppserviceToDeviceEvent>(event_json.clone()).unwrap();
+            assert_eq!(event.sender(), user_id!("@alice:example.org"));
+            assert_eq!(event.to_user_id, user_id!("@bob:example.org"));
+            assert_eq!(event.to_device_id, device_id!("DEVICEID"));
+            assert_eq!(event.event_type().to_string(), "m.key.verification.request");
         }
     }
 }

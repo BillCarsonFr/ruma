@@ -2,22 +2,22 @@
 #![allow(dead_code)]
 
 use http::{
-    header::{Entry, LOCATION},
     StatusCode,
+    header::{Entry, LOCATION},
 };
 use ruma_common::{
-    api::{request, response, Metadata, OutgoingResponse as _},
+    api::{OutgoingResponse as _, auth_scheme::NoAuthentication, request, response},
     metadata,
 };
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: GET,
     rate_limited: false,
-    authentication: None,
+    authentication: NoAuthentication,
     history: {
         unstable => "/_matrix/my/endpoint",
     }
-};
+}
 
 /// Request type for the `status_override` endpoint.
 #[request]

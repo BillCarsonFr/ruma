@@ -5,20 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomidcontexteventid
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3roomsroomidcontexteventid
 
-    use js_int::{uint, UInt};
+    use js_int::{UInt, uint};
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedEventId, OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedEventId, OwnedRoomId,
     };
     use ruma_events::{AnyStateEvent, AnyTimelineEvent};
 
     use crate::filter::RoomEventFilter;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/context/{event_id}",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/context/{event_id}",
         }
-    };
+    }
 
     /// Request type for the `get_context` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to get events from.
         #[ruma_api(path)]
@@ -60,7 +60,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_context` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// A token that can be used to paginate backwards with.
@@ -108,6 +108,7 @@ pub mod v3 {
         uint!(10)
     }
 
+    #[cfg(feature = "client")]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_default_limit(val: &UInt) -> bool {
         *val == default_limit()

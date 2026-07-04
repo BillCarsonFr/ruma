@@ -3,7 +3,7 @@
 //! The only content valid for this event is `PresenceEventContent`.
 
 use js_int::UInt;
-use ruma_common::{presence::PresenceState, OwnedMxcUri, OwnedUserId};
+use ruma_common::{OwnedMxcUri, OwnedUserId, presence::PresenceState};
 use serde::{Deserialize, Serialize};
 
 /// Presence event.
@@ -72,15 +72,18 @@ impl PresenceEventContent {
 #[cfg(test)]
 mod tests {
     use js_int::uint;
-    use ruma_common::{mxc_uri, presence::PresenceState};
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{
+        canonical_json::assert_to_canonical_json_eq, mxc_uri, owned_mxc_uri,
+        presence::PresenceState,
+    };
+    use serde_json::{from_value as from_json_value, json};
 
     use super::{PresenceEvent, PresenceEventContent};
 
     #[test]
     fn serialization() {
         let content = PresenceEventContent {
-            avatar_url: Some(mxc_uri!("mxc://localhost/wefuiwegh8742w").to_owned()),
+            avatar_url: Some(owned_mxc_uri!("mxc://localhost/wefuiwegh8742w")),
             currently_active: Some(false),
             displayname: None,
             last_active_ago: Some(uint!(2_478_593)),
@@ -88,15 +91,16 @@ mod tests {
             status_msg: Some("Making cupcakes".into()),
         };
 
-        let json = json!({
-            "avatar_url": "mxc://localhost/wefuiwegh8742w",
-            "currently_active": false,
-            "last_active_ago": 2_478_593,
-            "presence": "online",
-            "status_msg": "Making cupcakes"
-        });
-
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "avatar_url": "mxc://localhost/wefuiwegh8742w",
+                "currently_active": false,
+                "last_active_ago": 2_478_593,
+                "presence": "online",
+                "status_msg": "Making cupcakes",
+            }),
+        );
     }
 
     #[test]

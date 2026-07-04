@@ -1,12 +1,14 @@
 //! Types for the [`m.room.member`] event.
 //!
-//! [`m.room.member`]: https://spec.matrix.org/latest/client-server-api/#mroommember
+//! [`m.room.member`]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
 
 use js_int::Int;
+#[cfg(feature = "unstable-msc4293")]
+use ruma_common::canonical_json::RedactionEvent;
 use ruma_common::{
+    OwnedMxcUri, OwnedTransactionId, OwnedUserId, ServerSignatures, UserId,
     room_version_rules::RedactionRules,
     serde::{CanBeEmpty, Raw, StringEnum},
-    OwnedMxcUri, OwnedTransactionId, OwnedUserId, ServerSignatures, UserId,
 };
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
@@ -107,6 +109,15 @@ pub struct RoomMemberEventContent {
     #[serde(rename = "join_authorised_via_users_server")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub join_authorized_via_users_server: Option<OwnedUserId>,
+
+    /// Flag indicating all of this user's events should be redacted.
+    #[cfg(feature = "unstable-msc4293")]
+    #[serde(
+        default,
+        rename = "org.matrix.msc4293.redact_events",
+        skip_serializing_if = "ruma_common::serde::is_default"
+    )]
+    pub redact_events: bool,
 }
 
 impl RoomMemberEventContent {
@@ -122,6 +133,8 @@ impl RoomMemberEventContent {
             blurhash: None,
             reason: None,
             join_authorized_via_users_server: None,
+            #[cfg(feature = "unstable-msc4293")]
+            redact_events: false,
         }
     }
 
@@ -147,7 +160,7 @@ impl RoomMemberEventContent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change<'a>(
         &'a self,
         prev_details: Option<MembershipDetails<'a>>,
@@ -175,13 +188,218 @@ impl RedactContent for RoomMemberEventContent {
 /// The possibly redacted form of [`RoomMemberEventContent`].
 ///
 /// This type is used when it's not obvious whether the content is redacted or not.
-pub type PossiblyRedactedRoomMemberEventContent = RoomMemberEventContent;
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct PossiblyRedactedRoomMemberEventContent {
+    /// The avatar URL for this user, if any.
+    ///
+    /// This is added by the homeserver. If you activate the `compat-empty-string-null` feature,
+    /// this field being an empty string in JSON will result in `None` here during deserialization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "compat-empty-string-null",
+        serde(default, deserialize_with = "ruma_common::serde::empty_string_as_none")
+    )]
+    pub avatar_url: Option<OwnedMxcUri>,
 
-impl PossiblyRedactedStateEventContent for RoomMemberEventContent {
+    /// The display name for this user, if any.
+    ///
+    /// This is added by the homeserver.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub displayname: Option<String>,
+
+    /// Flag indicating whether the room containing this event was created with the intention of
+    /// being a direct chat.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_direct: Option<bool>,
+
+    /// The membership state of this user.
+    pub membership: MembershipState,
+
+    /// If this member event is the successor to a third party invitation, this field will
+    /// contain information about that invitation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub third_party_invite: Option<PossiblyRedactedThirdPartyInvite>,
+
+    /// The [BlurHash](https://blurha.sh) for the avatar pointed to by `avatar_url`.
+    ///
+    /// This uses the unstable prefix in
+    /// [MSC2448](https://github.com/matrix-org/matrix-spec-proposals/pull/2448).
+    #[cfg(feature = "unstable-msc2448")]
+    #[serde(rename = "xyz.amorgan.blurhash", skip_serializing_if = "Option::is_none")]
+    pub blurhash: Option<String>,
+
+    /// User-supplied text for why their membership has changed.
+    ///
+    /// For kicks and bans, this is typically the reason for the kick or ban. For other membership
+    /// changes, this is a way for the user to communicate their intent without having to send a
+    /// message to the room, such as in a case where Bob rejects an invite from Alice about an
+    /// upcoming concert, but can't make it that day.
+    ///
+    /// Clients are not recommended to show this reason to users when receiving an invite due to
+    /// the potential for spam and abuse. Hiding the reason behind a button or other component
+    /// is recommended.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+
+    /// Arbitrarily chosen `UserId` (MxID) of a local user who can send an invite.
+    #[serde(rename = "join_authorised_via_users_server")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub join_authorized_via_users_server: Option<OwnedUserId>,
+
+    /// Flag indicating all of this user's events should be redacted.
+    ///
+    /// This uses the unstable prefix defined in [MSC4293].
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    #[serde(
+        default,
+        rename = "org.matrix.msc4293.redact_events",
+        skip_serializing_if = "ruma_common::serde::is_default"
+    )]
+    pub redact_events: bool,
+}
+
+impl PossiblyRedactedRoomMemberEventContent {
+    /// Creates a new `PossiblyRedactedRoomMemberEventContent` with the given membership state.
+    pub fn new(membership: MembershipState) -> Self {
+        Self {
+            membership,
+            avatar_url: None,
+            displayname: None,
+            is_direct: None,
+            third_party_invite: None,
+            #[cfg(feature = "unstable-msc2448")]
+            blurhash: None,
+            reason: None,
+            join_authorized_via_users_server: None,
+            #[cfg(feature = "unstable-msc4293")]
+            redact_events: false,
+        }
+    }
+
+    /// Obtain the details about this event that are required to calculate a membership change.
+    ///
+    /// This is required when you want to calculate the change a redacted `m.room.member` event
+    /// made.
+    pub fn details(&self) -> MembershipDetails<'_> {
+        MembershipDetails {
+            avatar_url: self.avatar_url.as_deref(),
+            displayname: self.displayname.as_deref(),
+            membership: &self.membership,
+        }
+    }
+
+    /// Helper function for membership change.
+    ///
+    /// This requires data from the full event:
+    ///
+    /// * The previous details computed from `event.unsigned.prev_content`,
+    /// * The sender of the event,
+    /// * The state key of the event.
+    ///
+    /// Check [the specification][spec] for details.
+    ///
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
+    pub fn membership_change<'a>(
+        &'a self,
+        prev_details: Option<MembershipDetails<'a>>,
+        sender: &UserId,
+        state_key: &UserId,
+    ) -> MembershipChange<'a> {
+        membership_change(self.details(), prev_details, sender, state_key)
+    }
+}
+
+impl PossiblyRedactedStateEventContent for PossiblyRedactedRoomMemberEventContent {
     type StateKey = OwnedUserId;
 
     fn event_type(&self) -> StateEventType {
         StateEventType::RoomMember
+    }
+}
+
+impl StaticEventContent for PossiblyRedactedRoomMemberEventContent {
+    const TYPE: &'static str = RoomMemberEventContent::TYPE;
+    type IsPrefix = <RoomMemberEventContent as StaticEventContent>::IsPrefix;
+}
+
+impl RedactContent for PossiblyRedactedRoomMemberEventContent {
+    type Redacted = Self;
+
+    fn redact(self, rules: &RedactionRules) -> Self {
+        Self {
+            membership: self.membership,
+            third_party_invite: self.third_party_invite.and_then(|i| i.redact(rules)),
+            join_authorized_via_users_server: self
+                .join_authorized_via_users_server
+                .filter(|_| rules.keep_room_member_join_authorised_via_users_server),
+            avatar_url: None,
+            displayname: None,
+            is_direct: None,
+            #[cfg(feature = "unstable-msc2448")]
+            blurhash: None,
+            reason: None,
+            #[cfg(feature = "unstable-msc4293")]
+            redact_events: false,
+        }
+    }
+}
+
+impl From<RoomMemberEventContent> for PossiblyRedactedRoomMemberEventContent {
+    fn from(value: RoomMemberEventContent) -> Self {
+        let RoomMemberEventContent {
+            avatar_url,
+            displayname,
+            is_direct,
+            membership,
+            third_party_invite,
+            #[cfg(feature = "unstable-msc2448")]
+            blurhash,
+            reason,
+            join_authorized_via_users_server,
+            #[cfg(feature = "unstable-msc4293")]
+            redact_events,
+        } = value;
+
+        Self {
+            avatar_url,
+            displayname,
+            is_direct,
+            membership,
+            third_party_invite: third_party_invite.map(Into::into),
+            #[cfg(feature = "unstable-msc2448")]
+            blurhash,
+            reason,
+            join_authorized_via_users_server,
+            #[cfg(feature = "unstable-msc4293")]
+            redact_events,
+        }
+    }
+}
+
+impl From<RedactedRoomMemberEventContent> for PossiblyRedactedRoomMemberEventContent {
+    fn from(value: RedactedRoomMemberEventContent) -> Self {
+        let RedactedRoomMemberEventContent {
+            membership,
+            third_party_invite,
+            join_authorized_via_users_server,
+        } = value;
+
+        Self {
+            avatar_url: None,
+            displayname: None,
+            is_direct: None,
+            membership,
+            third_party_invite: third_party_invite.map(Into::into),
+            #[cfg(feature = "unstable-msc2448")]
+            blurhash: None,
+            reason: None,
+            join_authorized_via_users_server,
+            #[cfg(feature = "unstable-msc4293")]
+            redact_events: false,
+        }
     }
 }
 
@@ -232,7 +450,7 @@ impl RedactedRoomMemberEventContent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change<'a>(
         &'a self,
         prev_details: Option<MembershipDetails<'a>>,
@@ -264,6 +482,18 @@ impl RoomMemberEvent {
             Self::Redacted(ev) => &ev.content.membership,
         }
     }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        if let Self::Original(ev) = self { ev.should_redact_events() } else { false }
+    }
 }
 
 impl SyncRoomMemberEvent {
@@ -274,11 +504,23 @@ impl SyncRoomMemberEvent {
             Self::Redacted(ev) => &ev.content.membership,
         }
     }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        if let Self::Original(ev) = self { ev.should_redact_events() } else { false }
+    }
 }
 
 /// The membership state of a user.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum MembershipState {
@@ -342,6 +584,53 @@ pub struct RedactedThirdPartyInvite {
     pub signed: Raw<SignedContent>,
 }
 
+/// Possibly redacted information about a third party invitation.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct PossiblyRedactedThirdPartyInvite {
+    /// A name which can be displayed to represent the user instead of their third party
+    /// identifier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+
+    /// A block of content which has been signed, which servers can use to verify the event.
+    ///
+    /// Clients should ignore this.
+    pub signed: Raw<SignedContent>,
+}
+
+impl PossiblyRedactedThirdPartyInvite {
+    /// Creates a new `PossiblyRedactedThirdPartyInvite` with the given display name and signed
+    /// content.
+    pub fn new(display_name: String, signed: Raw<SignedContent>) -> Self {
+        Self { display_name: Some(display_name), signed }
+    }
+
+    /// Transform `self` into a redacted form (removing most or all fields) according to the spec.
+    ///
+    /// Returns `None` if the field for this object was redacted according to the given
+    /// [`RedactionRules`], otherwise returns the redacted form.
+    fn redact(self, rules: &RedactionRules) -> Option<Self> {
+        rules
+            .keep_room_member_third_party_invite_signed
+            .then_some(Self { display_name: None, signed: self.signed })
+    }
+}
+
+impl From<ThirdPartyInvite> for PossiblyRedactedThirdPartyInvite {
+    fn from(value: ThirdPartyInvite) -> Self {
+        let ThirdPartyInvite { display_name, signed } = value;
+        Self { display_name: Some(display_name), signed }
+    }
+}
+
+impl From<RedactedThirdPartyInvite> for PossiblyRedactedThirdPartyInvite {
+    fn from(value: RedactedThirdPartyInvite) -> Self {
+        let RedactedThirdPartyInvite { signed } = value;
+        Self { display_name: None, signed }
+    }
+}
+
 /// A block of content which has been signed, which servers can use to verify a third party
 /// invitation.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -379,7 +668,7 @@ impl OriginalRoomMemberEvent {
     /// Get a reference to the `prev_content` in unsigned, if it exists.
     ///
     /// Shorthand for `event.unsigned.prev_content.as_ref()`
-    pub fn prev_content(&self) -> Option<&RoomMemberEventContent> {
+    pub fn prev_content(&self) -> Option<&PossiblyRedactedRoomMemberEventContent> {
         self.unsigned.prev_content.as_ref()
     }
 
@@ -391,9 +680,23 @@ impl OriginalRoomMemberEvent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change(&self) -> MembershipChange<'_> {
         membership_change(self.details(), self.prev_details(), &self.sender, &self.state_key)
+    }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        self.content.redact_events
+            && self.state_key != self.sender
+            && matches!(self.content.membership, MembershipState::Ban | MembershipState::Leave)
     }
 }
 
@@ -414,12 +717,25 @@ impl RedactedRoomMemberEvent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change<'a>(
         &'a self,
         prev_details: Option<MembershipDetails<'a>>,
     ) -> MembershipChange<'a> {
         membership_change(self.details(), prev_details, &self.sender, &self.state_key)
+    }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        // Redacted room member events lack the redact_events flag - see proposal.
+        false
     }
 }
 
@@ -435,7 +751,7 @@ impl OriginalSyncRoomMemberEvent {
     /// Get a reference to the `prev_content` in unsigned, if it exists.
     ///
     /// Shorthand for `event.unsigned.prev_content.as_ref()`
-    pub fn prev_content(&self) -> Option<&RoomMemberEventContent> {
+    pub fn prev_content(&self) -> Option<&PossiblyRedactedRoomMemberEventContent> {
         self.unsigned.prev_content.as_ref()
     }
 
@@ -447,9 +763,23 @@ impl OriginalSyncRoomMemberEvent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change(&self) -> MembershipChange<'_> {
         membership_change(self.details(), self.prev_details(), &self.sender, &self.state_key)
+    }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        self.content.redact_events
+            && self.state_key != self.sender
+            && matches!(self.content.membership, MembershipState::Ban | MembershipState::Leave)
     }
 }
 
@@ -470,12 +800,25 @@ impl RedactedSyncRoomMemberEvent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change<'a>(
         &'a self,
         prev_details: Option<MembershipDetails<'a>>,
     ) -> MembershipChange<'a> {
         membership_change(self.details(), prev_details, &self.sender, &self.state_key)
+    }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        // Redacted room member events lack the redact_events flag - see proposal.
+        false
     }
 }
 
@@ -496,12 +839,26 @@ impl StrippedRoomMemberEvent {
     ///
     /// Check [the specification][spec] for details.
     ///
-    /// [spec]: https://spec.matrix.org/latest/client-server-api/#mroommember
+    /// [spec]: https://spec.matrix.org/v1.18/client-server-api/#mroommember
     pub fn membership_change<'a>(
         &'a self,
         prev_details: Option<MembershipDetails<'a>>,
     ) -> MembershipChange<'a> {
         membership_change(self.details(), prev_details, &self.sender, &self.state_key)
+    }
+
+    /// Determines whether the user's events should be redacted based on their membership.
+    ///
+    /// Using [MSC4293], if `redact_events` is `true`, the sender is different to the state key,
+    /// and the membership is `ban` or `leave` (kick), `true` is returned. Otherwise, the flag
+    /// should be ignored, and `false` is returned.
+    ///
+    /// [MSC4293]: https://github.com/matrix-org/matrix-spec-proposals/pull/4293
+    #[cfg(feature = "unstable-msc4293")]
+    pub fn should_redact_events(&self) -> bool {
+        self.content.redact_events
+            && self.state_key != self.sender
+            && matches!(self.content.membership, MembershipState::Ban | MembershipState::Leave)
     }
 }
 
@@ -534,7 +891,7 @@ pub struct RoomMemberUnsigned {
 
     /// [Bundled aggregations] of related child events.
     ///
-    /// [Bundled aggregations]: https://spec.matrix.org/latest/client-server-api/#aggregations-of-child-events
+    /// [Bundled aggregations]: https://spec.matrix.org/v1.18/client-server-api/#aggregations-of-child-events
     #[serde(rename = "m.relations", default)]
     pub relations: BundledStateRelations,
 }
@@ -561,14 +918,26 @@ impl CanBeEmpty for RoomMemberUnsigned {
     }
 }
 
+#[cfg(feature = "unstable-msc4293")]
+impl RedactionEvent for OriginalRoomMemberEvent {}
+
+#[cfg(feature = "unstable-msc4293")]
+impl RedactionEvent for OriginalSyncRoomMemberEvent {}
+
+#[cfg(feature = "unstable-msc4293")]
+impl RedactionEvent for RoomMemberEvent {}
+
+#[cfg(feature = "unstable-msc4293")]
+impl RedactionEvent for SyncRoomMemberEvent {}
+
 #[cfg(test)]
 mod tests {
     use assert_matches2::assert_matches;
     use js_int::uint;
     use maplit::btreemap;
     use ruma_common::{
-        mxc_uri, serde::CanBeEmpty, server_name, server_signing_key_version, user_id,
-        MilliSecondsSinceUnixEpoch, ServerSigningKeyId, SigningKeyAlgorithm,
+        MilliSecondsSinceUnixEpoch, ServerSigningKeyId, SigningKeyAlgorithm, mxc_uri,
+        serde::CanBeEmpty, server_name, server_signing_key_version, user_id,
     };
     use serde_json::{from_value as from_json_value, json};
 
@@ -764,7 +1133,7 @@ mod tests {
         assert_eq!(prev_content.membership, MembershipState::Invite);
 
         let third_party_invite = prev_content.third_party_invite.unwrap();
-        assert_eq!(third_party_invite.display_name, "alice");
+        assert_eq!(third_party_invite.display_name.as_deref(), Some("alice"));
         let signed = third_party_invite.signed.deserialize().unwrap();
         assert_eq!(signed.mxid, "@alice:example.org");
         assert_eq!(signed.signatures.len(), 1);

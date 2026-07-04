@@ -3,32 +3,31 @@
 //! Get information about the server's supported feature set and other relevant capabilities
 //! ([spec]).
 //!
-//! [spec]: https://spec.matrix.org/latest/client-server-api/#capabilities-negotiation
+//! [spec]: https://spec.matrix.org/v1.18/client-server-api/#capabilities-negotiation
 
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3capabilities
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3capabilities
 
     use std::{borrow::Cow, collections::BTreeMap};
 
     use maplit::btreemap;
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata,
-        serde::StringEnum,
         RoomVersionId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
+        profile::ProfileFieldName,
+        serde::StringEnum,
     };
     use serde::{Deserialize, Serialize};
     use serde_json::{
-        from_value as from_json_value, to_value as to_json_value, Value as JsonValue,
+        Value as JsonValue, from_value as from_json_value, to_value as to_json_value,
     };
 
-    #[cfg(feature = "unstable-msc4133")]
-    use crate::profile::ProfileFieldName;
     use crate::PrivOwnedStr;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -36,15 +35,15 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/capabilities",
             1.1 => "/_matrix/client/v3/capabilities",
         }
-    };
+    }
 
     /// Request type for the `get_capabilities` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {}
 
     /// Response type for the `get_capabilities` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The capabilities the server supports
         pub capabilities: Capabilities,
@@ -73,6 +72,7 @@ pub mod v3 {
     /// Contains information about all the capabilities that the server supports.
     #[derive(Clone, Debug, Default, Serialize, Deserialize)]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    #[allow(deprecated)]
     pub struct Capabilities {
         /// Capability to indicate if the user can change their password.
         #[serde(
@@ -96,6 +96,7 @@ pub mod v3 {
             default,
             skip_serializing_if = "SetDisplayNameCapability::is_default"
         )]
+        #[deprecated = "Since Matrix 1.16, prefer profile_fields if it is set."]
         pub set_displayname: SetDisplayNameCapability,
 
         /// Capability to indicate if the user can change their avatar.
@@ -104,6 +105,7 @@ pub mod v3 {
             default,
             skip_serializing_if = "SetAvatarUrlCapability::is_default"
         )]
+        #[deprecated = "Since Matrix 1.16, prefer profile_fields if it is set."]
         pub set_avatar_url: SetAvatarUrlCapability,
 
         /// Capability to indicate if the user can change the third-party identifiers associated
@@ -125,13 +127,31 @@ pub mod v3 {
         pub get_login_token: GetLoginTokenCapability,
 
         /// Capability to indicate if the user can set extended profile fields.
-        #[cfg(feature = "unstable-msc4133")]
         #[serde(
-            rename = "uk.tcpip.msc4133.profile_fields",
-            alias = "m.profile_fields",
+            rename = "m.profile_fields",
+            alias = "uk.tcpip.msc4133.profile_fields",
             skip_serializing_if = "Option::is_none"
         )]
         pub profile_fields: Option<ProfileFieldsCapability>,
+
+        /// Capability to indicate if the server automatically forgets rooms that the user leaves.
+        #[serde(
+            rename = "m.forget_forced_upon_leave",
+            default,
+            skip_serializing_if = "ForgetForcedUponLeaveCapability::is_default"
+        )]
+        pub forget_forced_upon_leave: ForgetForcedUponLeaveCapability,
+
+        /// Capability to indicate if the user can perform account moderation actions via [server
+        /// administration] endpoints.
+        ///
+        /// [server administration]: https://spec.matrix.org/v1.18/client-server-api/#server-administration
+        #[serde(
+            rename = "m.account_moderation",
+            default,
+            skip_serializing_if = "AccountModerationCapability::is_default"
+        )]
+        pub account_moderation: AccountModerationCapability,
 
         /// Any other custom capabilities that the server supports outside of the specification,
         /// labeled using the Java package naming convention and stored as arbitrary JSON values.
@@ -157,10 +177,16 @@ pub mod v3 {
             match capability {
                 "m.change_password" => Some(Cow::Owned(serialize(&self.change_password))),
                 "m.room_versions" => Some(Cow::Owned(serialize(&self.room_versions))),
+                #[allow(deprecated)]
                 "m.set_displayname" => Some(Cow::Owned(serialize(&self.set_displayname))),
+                #[allow(deprecated)]
                 "m.set_avatar_url" => Some(Cow::Owned(serialize(&self.set_avatar_url))),
                 "m.3pid_changes" => Some(Cow::Owned(serialize(&self.thirdparty_id_changes))),
                 "m.get_login_token" => Some(Cow::Owned(serialize(&self.get_login_token))),
+                "m.forget_forced_upon_leave" => {
+                    Some(Cow::Owned(serialize(&self.forget_forced_upon_leave)))
+                }
+                "m.account_moderation" => Some(Cow::Owned(serialize(&self.account_moderation))),
                 _ => self.custom_capabilities.get(capability).map(Cow::Borrowed),
             }
         }
@@ -174,10 +200,18 @@ pub mod v3 {
             match capability {
                 "m.change_password" => self.change_password = from_json_value(value)?,
                 "m.room_versions" => self.room_versions = from_json_value(value)?,
+                #[allow(deprecated)]
                 "m.set_displayname" => self.set_displayname = from_json_value(value)?,
+                #[allow(deprecated)]
                 "m.set_avatar_url" => self.set_avatar_url = from_json_value(value)?,
                 "m.3pid_changes" => self.thirdparty_id_changes = from_json_value(value)?,
                 "m.get_login_token" => self.get_login_token = from_json_value(value)?,
+                "m.forget_forced_upon_leave" => {
+                    self.forget_forced_upon_leave = from_json_value(value)?;
+                }
+                "m.account_moderation" => {
+                    self.account_moderation = from_json_value(value)?;
+                }
                 _ => {
                     self.custom_capabilities.insert(capability.to_owned(), value);
                 }
@@ -257,7 +291,7 @@ pub mod v3 {
 
     /// The stability of a room version.
     #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-    #[derive(Clone, PartialEq, Eq, StringEnum)]
+    #[derive(Clone, StringEnum)]
     #[ruma_enum(rename_all = "lowercase")]
     #[non_exhaustive]
     pub enum RoomVersionStability {
@@ -274,11 +308,13 @@ pub mod v3 {
     /// Information about the `m.set_displayname` capability
     #[derive(Clone, Debug, Serialize, Deserialize)]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    #[deprecated = "Since Matrix 1.16, prefer ProfileFieldsCapability instead."]
     pub struct SetDisplayNameCapability {
         /// `true` if the user can change their display name, `false` otherwise.
         pub enabled: bool,
     }
 
+    #[allow(deprecated)]
     impl SetDisplayNameCapability {
         /// Creates a new `SetDisplayNameCapability` with the given enabled flag.
         pub fn new(enabled: bool) -> Self {
@@ -291,6 +327,7 @@ pub mod v3 {
         }
     }
 
+    #[allow(deprecated)]
     impl Default for SetDisplayNameCapability {
         fn default() -> Self {
             Self { enabled: true }
@@ -300,11 +337,13 @@ pub mod v3 {
     /// Information about the `m.set_avatar_url` capability
     #[derive(Clone, Debug, Serialize, Deserialize)]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    #[deprecated = "Since Matrix 1.16, prefer ProfileFieldsCapability instead."]
     pub struct SetAvatarUrlCapability {
         /// `true` if the user can change their avatar, `false` otherwise.
         pub enabled: bool,
     }
 
+    #[allow(deprecated)]
     impl SetAvatarUrlCapability {
         /// Creates a new `SetAvatarUrlCapability` with the given enabled flag.
         pub fn new(enabled: bool) -> Self {
@@ -317,6 +356,7 @@ pub mod v3 {
         }
     }
 
+    #[allow(deprecated)]
     impl Default for SetAvatarUrlCapability {
         fn default() -> Self {
             Self { enabled: true }
@@ -371,7 +411,6 @@ pub mod v3 {
     }
 
     /// Information about the `m.profile_fields` capability.
-    #[cfg(feature = "unstable-msc4133")]
     #[derive(Clone, Debug, Default, Serialize, Deserialize)]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
     pub struct ProfileFieldsCapability {
@@ -389,7 +428,6 @@ pub mod v3 {
         pub disallowed: Option<Vec<ProfileFieldName>>,
     }
 
-    #[cfg(feature = "unstable-msc4133")]
     impl ProfileFieldsCapability {
         /// Creates a new `ProfileFieldsCapability` with the given enabled flag.
         pub fn new(enabled: bool) -> Self {
@@ -410,6 +448,57 @@ pub mod v3 {
                 // The default is that any field is allowed.
                 true
             }
+        }
+    }
+
+    /// Information about the [`m.forget_forced_upon_leave`] capability.
+    ///
+    /// [`m.forget_forced_upon_leave`]: https://spec.matrix.org/v1.18/client-server-api/#mforget_forced_upon_leave-capability
+    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+    #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    pub struct ForgetForcedUponLeaveCapability {
+        /// Whether the server will automatically forget any room that the user leaves.
+        ///
+        /// This behavior applies irrespective of whether the user has left the room on their own
+        /// or has been kicked or banned from the room by another user.
+        pub enabled: bool,
+    }
+
+    impl ForgetForcedUponLeaveCapability {
+        /// Creates a new `ForgetForcedUponLeaveCapability` with the given enabled flag.
+        pub fn new(enabled: bool) -> Self {
+            Self { enabled }
+        }
+
+        /// Returns whether all fields have their default value.
+        pub fn is_default(&self) -> bool {
+            !self.enabled
+        }
+    }
+
+    /// Information about the `m.account_moderation` capability.
+    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+    #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+    pub struct AccountModerationCapability {
+        /// Whether the user can suspend a user via `PUT /admin/suspend/{userId}`.
+        #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
+        pub suspend: bool,
+
+        /// Whether the user can lock a user via `PUT /admin/lock/{userId}`.
+        #[serde(default, skip_serializing_if = "ruma_common::serde::is_default")]
+        pub lock: bool,
+    }
+
+    impl AccountModerationCapability {
+        /// Creates a new `AccountModerationCapability` with the given suspend and lock
+        /// capabilities.
+        pub fn new(suspend: bool, lock: bool) -> Self {
+            Self { suspend, lock }
+        }
+
+        /// Returns whether all fields have their default value.
+        pub fn is_default(&self) -> bool {
+            !self.suspend && !self.lock
         }
     }
 }

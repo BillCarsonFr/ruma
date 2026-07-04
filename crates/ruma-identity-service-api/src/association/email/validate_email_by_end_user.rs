@@ -5,21 +5,22 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#get_matrixidentityv2validateemailsubmittoken
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#get_matrixidentityv2validateemailsubmittoken
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedClientSecret, OwnedSessionId,
+        OwnedClientSecret, OwnedSessionId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/validate/email/submitToken",
         }
-    };
+    }
 
     /// Request type for the `validate_email_by_end_user` endpoint.
     #[request]

@@ -5,22 +5,23 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#get_matrixfederationv1make_joinroomiduserid
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#get_matrixfederationv1make_joinroomiduserid
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomId, OwnedUserId, RoomVersionId,
+        OwnedRoomId, OwnedUserId, RoomVersionId,
+        api::{request, response},
+        metadata,
     };
     use serde_json::value::RawValue as RawJsonValue;
 
-    const METADATA: Metadata = metadata! {
+    use crate::authentication::ServerSignatures;
+
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: ServerSignatures,
-        history: {
-            1.0 => "/_matrix/federation/v1/make_join/{room_id}/{user_id}",
-        }
-    };
+        path: "/_matrix/federation/v1/make_join/{room_id}/{user_id}",
+    }
 
     /// Request type for the `create_join_event_template` endpoint.
     #[request]
@@ -52,10 +53,12 @@ pub mod v1 {
         pub event: Box<RawJsonValue>,
     }
 
+    #[cfg(feature = "server")]
     fn default_ver() -> Vec<RoomVersionId> {
         vec![RoomVersionId::V1]
     }
 
+    #[cfg(feature = "client")]
     fn is_default_ver(ver: &[RoomVersionId]) -> bool {
         *ver == [RoomVersionId::V1]
     }

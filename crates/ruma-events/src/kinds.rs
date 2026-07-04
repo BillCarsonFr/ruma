@@ -1,14 +1,12 @@
-#![allow(clippy::exhaustive_structs)]
-
 use as_variant::as_variant;
 use ruma_common::{
+    EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, UserId,
     encryption::DeviceKeys,
     room_version_rules::RedactionRules,
-    serde::{from_raw_json_value, JsonCastable, JsonObject, Raw},
-    EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId, UserId,
+    serde::{JsonCastable, JsonObject, Raw, from_raw_json_value},
 };
 use ruma_macros::Event;
-use serde::{ser::SerializeStruct, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, ser::SerializeStruct};
 use serde_json::value::RawValue as RawJsonValue;
 
 #[cfg(feature = "unstable-msc4354")]
@@ -24,9 +22,17 @@ use super::{
 
 /// A global account data event.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct GlobalAccountDataEvent<C: GlobalAccountDataEventContent> {
     /// Data specific to the event type.
     pub content: C,
+}
+
+impl<C: GlobalAccountDataEventContent> GlobalAccountDataEvent<C> {
+    /// Construct a new `GlobalAccountDataEvent` with the given content.
+    pub fn new(content: C) -> Self {
+        Self { content }
+    }
 }
 
 impl<C: GlobalAccountDataEventContent> Serialize for GlobalAccountDataEvent<C> {
@@ -45,9 +51,17 @@ impl<C: GlobalAccountDataEventContent> JsonCastable<JsonObject> for GlobalAccoun
 
 /// A room account data event.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RoomAccountDataEvent<C: RoomAccountDataEventContent> {
     /// Data specific to the event type.
     pub content: C,
+}
+
+impl<C: RoomAccountDataEventContent> RoomAccountDataEvent<C> {
+    /// Construct a new `RoomAccountDataEvent` with the given content.
+    pub fn new(content: C) -> Self {
+        Self { content }
+    }
 }
 
 impl<C: RoomAccountDataEventContent> Serialize for RoomAccountDataEvent<C> {
@@ -66,12 +80,20 @@ impl<C: RoomAccountDataEventContent> JsonCastable<JsonObject> for RoomAccountDat
 
 /// An ephemeral room event.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct EphemeralRoomEvent<C: EphemeralRoomEventContent> {
     /// Data specific to the event type.
     pub content: C,
 
     /// The ID of the room associated with this event.
     pub room_id: OwnedRoomId,
+}
+
+impl<C: EphemeralRoomEventContent> EphemeralRoomEvent<C> {
+    /// Construct a new `EphemeralRoomEvent` with the given content and room ID.
+    pub fn new(room_id: OwnedRoomId, content: C) -> Self {
+        Self { content, room_id }
+    }
 }
 
 impl<C: EphemeralRoomEventContent> Serialize for EphemeralRoomEvent<C> {
@@ -96,9 +118,17 @@ impl<C: EphemeralRoomEventContent> JsonCastable<JsonObject> for EphemeralRoomEve
 
 /// An ephemeral room event without a `room_id`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct SyncEphemeralRoomEvent<C: EphemeralRoomEventContent> {
     /// Data specific to the event type.
     pub content: C,
+}
+
+impl<C: EphemeralRoomEventContent> SyncEphemeralRoomEvent<C> {
+    /// Construct a new `SyncEphemeralRoomEvent` with the given content and room ID.
+    pub fn new(content: C) -> Self {
+        Self { content }
+    }
 }
 
 impl<C: EphemeralRoomEventContent> Serialize for SyncEphemeralRoomEvent<C> {
@@ -120,6 +150,7 @@ impl<C: EphemeralRoomEventContent> JsonCastable<JsonObject> for SyncEphemeralRoo
 /// `OriginalMessageLikeEvent` implements the comparison traits using only the `event_id` field, a
 /// sorted list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OriginalMessageLikeEvent<C: MessageLikeEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -173,6 +204,7 @@ impl<C: MessageLikeEventContent> JsonCastable<JsonObject> for OriginalMessageLik
 /// `OriginalSyncMessageLikeEvent` implements the comparison traits using only the `event_id` field,
 /// a sorted list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OriginalSyncMessageLikeEvent<C: MessageLikeEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -220,6 +252,7 @@ impl<C: MessageLikeEventContent> JsonCastable<JsonObject> for OriginalSyncMessag
 /// `RedactedMessageLikeEvent` implements the comparison traits using only the `event_id` field, a
 /// sorted list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedMessageLikeEvent<C: RedactedMessageLikeEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -266,6 +299,7 @@ impl<C: RedactedMessageLikeEventContent> JsonCastable<JsonObject> for RedactedMe
 /// `RedactedSyncMessageLikeEvent` implements the comparison traits using only the `event_id` field,
 /// a sorted list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedSyncMessageLikeEvent<C: RedactedMessageLikeEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -353,6 +387,7 @@ where
 /// `OriginalStateEvent` implements the comparison traits using only the `event_id` field, a sorted
 /// list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OriginalStateEvent<C: StaticStateEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -418,6 +453,7 @@ impl<C: StaticStateEventContent> JsonCastable<JsonObject> for OriginalStateEvent
 /// `OriginalSyncStateEvent` implements the comparison traits using only the `event_id` field, a
 /// sorted list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OriginalSyncStateEvent<C: StaticStateEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -468,6 +504,7 @@ impl<C: StaticStateEventContent> JsonCastable<JsonObject> for OriginalSyncStateE
 
 /// A stripped-down state event, used for previews of rooms the user has been invited to.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct StrippedStateEvent<C: PossiblyRedactedStateEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -483,25 +520,23 @@ pub struct StrippedStateEvent<C: PossiblyRedactedStateEventContent> {
     /// the same tuple replaces the previous one.
     pub state_key: C::StateKey,
 
-    /// The globally unique identifier for the event.
-    ///
-    /// This field is usually stripped, but some events might include it.
-    #[cfg(feature = "unstable-msc4319")]
-    #[ruma_event(default)]
-    pub event_id: Option<OwnedEventId>,
-
     /// Timestamp on the originating homeserver when this event was sent.
     ///
     /// This field is usually stripped, but some events might include it.
     #[cfg(feature = "unstable-msc4319")]
     #[ruma_event(default)]
     pub origin_server_ts: Option<MilliSecondsSinceUnixEpoch>,
+
+    /// Additional key-value pairs not signed by the homeserver.
+    #[cfg(feature = "unstable-msc4319")]
+    pub unsigned: Option<Raw<crate::StateUnsigned<C>>>,
 }
 
 impl<C: PossiblyRedactedStateEventContent> JsonCastable<JsonObject> for StrippedStateEvent<C> {}
 
 /// A minimal state event, used for creating a new room.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct InitialStateEvent<C: StaticStateEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -518,14 +553,22 @@ pub struct InitialStateEvent<C: StaticStateEventContent> {
 }
 
 impl<C: StaticStateEventContent> InitialStateEvent<C> {
+    /// Create a new `InitialStateEvent` for an event type with the given state key.
+    ///
+    /// For cases where the state key is empty,
+    /// [`with_empty_state_key()`](Self::with_empty_state_key) can be used instead.
+    pub fn new(state_key: C::StateKey, content: C) -> Self {
+        Self { content, state_key }
+    }
+
     /// Create a new `InitialStateEvent` for an event type with an empty state key.
     ///
-    /// For cases where the state key is not empty, use a struct literal to create the event.
-    pub fn new(content: C) -> Self
+    /// For cases where the state key is not empty, use [`new()`](Self::new).
+    pub fn with_empty_state_key(content: C) -> Self
     where
         C: StaticStateEventContent<StateKey = EmptyStateKey>,
     {
-        Self { content, state_key: EmptyStateKey }
+        Self::new(EmptyStateKey, content)
     }
 
     /// Shorthand for `Raw::new(self).unwrap()`.
@@ -580,6 +623,7 @@ impl<C: StaticStateEventContent> JsonCastable<JsonObject> for InitialStateEvent<
 /// `RedactedStateEvent` implements the comparison traits using only the `event_id` field, a sorted
 /// list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedStateEvent<C: RedactedStateEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -634,6 +678,7 @@ impl<C: RedactedStateEventContent> JsonCastable<JsonObject> for RedactedStateEve
 /// `RedactedSyncStateEvent` implements the comparison traits using only the `event_id` field, a
 /// sorted list would be sorted lexicographically based on the event's `EventId`.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RedactedSyncStateEvent<C: RedactedStateEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -735,12 +780,20 @@ impl<C: StaticStateEventContent + RedactContent> JsonCastable<JsonObject> for Sy
 
 /// An event sent using send-to-device messaging.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct ToDeviceEvent<C: ToDeviceEventContent> {
     /// Data specific to the event type.
     pub content: C,
 
     /// The fully-qualified ID of the user who sent this event.
     pub sender: OwnedUserId,
+}
+
+impl<C: ToDeviceEventContent> ToDeviceEvent<C> {
+    /// Construct a new `ToDeviceEvent` with the given content and sender.
+    pub fn new(sender: OwnedUserId, content: C) -> Self {
+        Self { content, sender }
+    }
 }
 
 impl<C: ToDeviceEventContent> Serialize for ToDeviceEvent<C> {
@@ -760,6 +813,7 @@ impl<C: ToDeviceEventContent> JsonCastable<JsonObject> for ToDeviceEvent<C> {}
 
 /// The decrypted payload of an `m.olm.v1.curve25519-aes-sha2` event.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct DecryptedOlmV1Event<C: MessageLikeEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -782,13 +836,22 @@ pub struct DecryptedOlmV1Event<C: MessageLikeEventContent> {
 
 /// Public keys used for an `m.olm.v1.curve25519-aes-sha2` event.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct OlmV1Keys {
     /// An ed25519 key.
     pub ed25519: String,
 }
 
+impl OlmV1Keys {
+    /// Construct a new `OlmV1Keys` with the given ed25519 key.
+    pub fn new(ed25519: String) -> Self {
+        Self { ed25519 }
+    }
+}
+
 /// The decrypted payload of an `m.megolm.v1.aes-sha2` event.
 #[derive(Clone, Debug, Event)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct DecryptedMegolmV1Event<C: MessageLikeEventContent> {
     /// Data specific to the event type.
     pub content: C,
@@ -797,12 +860,11 @@ pub struct DecryptedMegolmV1Event<C: MessageLikeEventContent> {
     pub room_id: OwnedRoomId,
 }
 
-/// A possibly-redacted state event content.
-///
-/// A non-redacted content also contains the `prev_content` from the unsigned event data.
+/// A possibly-redacted state event content and the corresponding previous content from the unsigned
+/// event data, if available.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug)]
-pub enum FullStateEventContent<C: StaticStateEventContent + RedactContent> {
+pub enum StateEventContentChange<C: StaticStateEventContent + RedactContent> {
     /// Original, unredacted content of the event.
     Original {
         /// Current content of the room state.
@@ -816,7 +878,7 @@ pub enum FullStateEventContent<C: StaticStateEventContent + RedactContent> {
     Redacted(C::Redacted),
 }
 
-impl<C: StaticStateEventContent + RedactContent> FullStateEventContent<C>
+impl<C: StaticStateEventContent + RedactContent> StateEventContentChange<C>
 where
     C::Redacted: RedactedStateEventContent,
 {
@@ -836,8 +898,8 @@ where
     /// [`RedactionRules`] has to be specified.
     pub fn redact(self, rules: &RedactionRules) -> C::Redacted {
         match self {
-            FullStateEventContent::Original { content, .. } => content.redact(rules),
-            FullStateEventContent::Redacted(content) => content,
+            Self::Original { content, .. } => content.redact(rules),
+            Self::Redacted(content) => content,
         }
     }
 }

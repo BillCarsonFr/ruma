@@ -7,26 +7,24 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/server-server-api/#put_matrixfederationv13pidonbind
+    //! [spec]: https://spec.matrix.org/v1.18/server-server-api/#put_matrixfederationv13pidonbind
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId, OwnedUserId,
+        api::{auth_scheme::NoAuthentication, request, response},
         metadata,
         serde::Raw,
         thirdparty::Medium,
-        OwnedRoomId, OwnedUserId,
     };
     use ruma_events::room::member::SignedContent;
     use serde::{Deserialize, Serialize};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: PUT,
         rate_limited: false,
-        authentication: None,
-        history: {
-            1.0 => "/_matrix/federation/v1/3pid/onbind",
-        }
-    };
+        authentication: NoAuthentication,
+        path: "/_matrix/federation/v1/3pid/onbind",
+    }
 
     /// Request type for the `bind_callback` endpoint.
     #[request]

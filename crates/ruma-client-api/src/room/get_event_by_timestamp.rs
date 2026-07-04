@@ -5,14 +5,15 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1roomsroomidtimestamp_to_event
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1roomsroomidtimestamp_to_event
 
     use ruma_common::{
-        api::{request, response, Direction, Metadata},
-        metadata, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId,
+        MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId,
+        api::{Direction, auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -20,10 +21,10 @@ pub mod v1 {
             unstable("org.matrix.msc3030") => "/_matrix/client/unstable/org.matrix.msc3030/rooms/{room_id}/timestamp_to_event",
             1.6 => "/_matrix/client/v1/rooms/{room_id}/timestamp_to_event",
         }
-    };
+    }
 
     /// Request type for the `get_event_by_timestamp` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The ID of the room the event is in.
         #[ruma_api(path)]
@@ -39,7 +40,7 @@ pub mod v1 {
     }
 
     /// Response type for the `get_event_by_timestamp` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The ID of the event found.
         pub event_id: OwnedEventId,

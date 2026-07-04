@@ -1,11 +1,12 @@
 use ruma_common::{
-    serde::{from_raw_json_value, JsonObject},
     OwnedEventId,
+    serde::{JsonObject, from_raw_json_value},
 };
-use serde::{ser::SerializeStruct, Deserialize, Deserializer, Serialize};
-use serde_json::{value::RawValue as RawJsonValue, Value as JsonValue};
+use serde::{Deserialize, Deserializer};
+use serde_json::{Value as JsonValue, value::RawValue as RawJsonValue};
 
-use super::{InReplyTo, Relation, Thread};
+use super::{InReplyTo, Relation, Reply, Thread};
+use crate::relation::CustomRelation;
 
 impl<'de> Deserialize<'de> for Relation {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -26,8 +27,8 @@ impl<'de> Deserialize<'de> for Relation {
             (_, Some("m.annotation")) => Relation::Annotation(from_raw_json_value(&json)?),
             (_, Some("m.reference")) => Relation::Reference(from_raw_json_value(&json)?),
             (_, Some("m.replace")) => Relation::Replacement(from_raw_json_value(&json)?),
-            (Some(in_reply_to), _) => Relation::Reply { in_reply_to },
-            _ => Relation::_Custom(from_raw_json_value(&json)?),
+            (Some(in_reply_to), _) => Relation::Reply(Reply { in_reply_to }),
+            _ => Relation::_Custom(CustomRelation(from_raw_json_value(&json)?)),
         };
 
         Ok(rel)
@@ -59,26 +60,6 @@ impl Relation {
                 obj
             }
             _ => panic!("all relations must serialize to objects"),
-        }
-    }
-}
-
-impl Serialize for Relation {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Relation::Reply { in_reply_to } => {
-                let mut st = serializer.serialize_struct("Relation", 1)?;
-                st.serialize_field("m.in_reply_to", in_reply_to)?;
-                st.end()
-            }
-            Relation::Replacement(data) => data.serialize(serializer),
-            Relation::Reference(data) => data.serialize(serializer),
-            Relation::Annotation(data) => data.serialize(serializer),
-            Relation::Thread(data) => data.serialize(serializer),
-            Relation::_Custom(c) => c.serialize(serializer),
         }
     }
 }

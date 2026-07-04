@@ -1,8 +1,8 @@
 //! Common types for the [`m.room.power_levels` event][power_levels].
 //!
-//! [power_levels]: https://spec.matrix.org/latest/client-server-api/#mroompower_levels
+//! [power_levels]: https://spec.matrix.org/v1.18/client-server-api/#mroompower_levels
 
-use js_int::{int, Int};
+use js_int::{Int, int};
 use ruma_macros::StringEnum;
 use serde::{Deserialize, Serialize};
 
@@ -54,7 +54,7 @@ pub fn default_power_level() -> Int {
 }
 
 /// The possible keys of [`NotificationPowerLevels`].
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
 #[ruma_enum(rename_all = "lowercase")]
 #[non_exhaustive]

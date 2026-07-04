@@ -1,18 +1,16 @@
 use assert_matches2::assert_matches;
 use js_int::uint;
-use ruma_common::mxc_uri;
+use ruma_common::{canonical_json::assert_to_canonical_json_eq, mxc_uri};
 use ruma_events::{
-    room::{join_rules::JoinRule, topic::RoomTopicEventContent},
     AnyStrippedStateEvent,
+    room::{join_rules::JoinRule, topic::RoomTopicEventContent},
 };
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use serde_json::{from_value as from_json_value, json};
 
 #[test]
 fn serialize_stripped_state_event_any_content() {
-    let json = to_json_value(RoomTopicEventContent::new("Testing room".into())).unwrap();
-
-    assert_eq!(
-        json,
+    assert_to_canonical_json_eq!(
+        RoomTopicEventContent::new("Testing room".into()),
         json!({
             "topic": "Testing room",
             "m.topic": {
@@ -94,33 +92,37 @@ fn deserialize_stripped_state_events() {
 
 #[test]
 #[cfg(feature = "unstable-msc4319")]
-fn deserialize_stripped_state_sync_format() {
+fn deserialize_stripped_state_msc4319_format() {
     use js_int::uint;
-    use ruma_common::{event_id, user_id, MilliSecondsSinceUnixEpoch};
+    use ruma_common::{MilliSecondsSinceUnixEpoch, user_id};
     use ruma_events::room::member::MembershipState;
 
     let user_id = user_id!("@patrick:localhost");
-    let event_id = event_id!("$abcdefgh");
     let origin_server_ts = MilliSecondsSinceUnixEpoch(uint!(1_000_000));
 
-    // Sync format.
-    let sync_event_json = json!({
+    let event_json = json!({
         "content": {
-            "membership": "join",
+            "membership": "invite",
         },
-        "event_id": event_id,
         "origin_server_ts": origin_server_ts,
         "sender": user_id,
         "state_key": user_id,
         "type": "m.room.member",
+        "unsigned": {
+            "prev_content": {
+                "membership": "knock",
+            },
+        },
     });
     assert_matches!(
-        from_json_value::<AnyStrippedStateEvent>(sync_event_json).unwrap(),
-        AnyStrippedStateEvent::RoomMember(sync_member_event)
+        from_json_value::<AnyStrippedStateEvent>(event_json).unwrap(),
+        AnyStrippedStateEvent::RoomMember(member_event)
     );
-    assert_eq!(sync_member_event.content.membership, MembershipState::Join);
-    assert_eq!(sync_member_event.event_id.as_deref(), Some(event_id));
-    assert_eq!(sync_member_event.origin_server_ts, Some(origin_server_ts));
-    assert_eq!(sync_member_event.sender, user_id);
-    assert_eq!(sync_member_event.state_key, user_id);
+    assert_eq!(member_event.content.membership, MembershipState::Invite);
+    assert_eq!(member_event.origin_server_ts, Some(origin_server_ts));
+    assert_eq!(member_event.sender, user_id);
+    assert_eq!(member_event.state_key, user_id);
+
+    let unsigned = member_event.unsigned.unwrap().deserialize().unwrap();
+    assert_eq!(unsigned.prev_content.unwrap().membership, MembershipState::Knock);
 }

@@ -5,16 +5,16 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3voipturnserver
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3voipturnserver
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -22,15 +22,15 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/voip/turnServer",
             1.1 => "/_matrix/client/v3/voip/turnServer",
         }
-    };
+    }
 
     /// Request type for the `turn_server_info` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {}
 
     /// Response type for the `turn_server_info` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The username to use.
         pub username: String,

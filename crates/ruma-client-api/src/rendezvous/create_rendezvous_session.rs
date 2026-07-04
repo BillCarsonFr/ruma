@@ -2,35 +2,36 @@
 //!
 //! Create a rendezvous session.
 
-pub mod unstable {
-    //! `msc4108` ([MSC])
+#[cfg(feature = "unstable-msc4108")]
+pub mod unstable_msc4108 {
+    //! `unstable/org.matrix.msc4108` ([MSC])
     //!
     //! [MSC]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
 
-    use http::{
-        header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, EXPIRES, LAST_MODIFIED},
-        HeaderName,
-    };
+    use http::header::{CONTENT_TYPE, ETAG, EXPIRES, LAST_MODIFIED};
     #[cfg(feature = "client")]
     use ruma_common::api::error::FromHttpResponseError;
     use ruma_common::{
-        api::{error::HeaderDeserializationError, Metadata},
+        api::{
+            auth_scheme::NoAccessToken,
+            error::{Error, HeaderDeserializationError},
+        },
         metadata,
     };
     use serde::{Deserialize, Serialize};
     use url::Url;
     use web_time::SystemTime;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
-        authentication: None,
+        authentication: NoAccessToken,
         history: {
             unstable("org.matrix.msc4108") => "/_matrix/client/unstable/org.matrix.msc4108/rendezvous",
         }
-    };
+    }
 
-    /// Request type for the `POST` `rendezvous` endpoint.
+    /// Request type for the `POST` `rendezvous` endpoint from the 2024 version of MSC4108.
     #[derive(Debug, Default, Clone)]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
     pub struct Request {
@@ -40,22 +41,24 @@ pub mod unstable {
 
     #[cfg(feature = "client")]
     impl ruma_common::api::OutgoingRequest for Request {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
         type IncomingResponse = Response;
-        const METADATA: Metadata = METADATA;
 
         fn try_into_http_request<T: Default + bytes::BufMut>(
             self,
             base_url: &str,
-            _: ruma_common::api::SendAccessToken<'_>,
-            considering: &'_ ruma_common::api::SupportedVersions,
+            _: ruma_common::api::auth_scheme::SendAccessToken<'_>,
+            considering: std::borrow::Cow<'_, ruma_common::api::SupportedVersions>,
         ) -> Result<http::Request<T>, ruma_common::api::error::IntoHttpError> {
-            let url = METADATA.make_endpoint_url(considering, base_url, &[], "")?;
+            use http::header::CONTENT_LENGTH;
+            use ruma_common::api::Metadata;
+
+            let url = Self::make_endpoint_url(considering, base_url, &[], "")?;
             let body = self.content.as_bytes();
             let content_length = body.len();
 
             Ok(http::Request::builder()
-                .method(METADATA.method)
+                .method(Self::METHOD)
                 .uri(url)
                 .header(CONTENT_TYPE, "text/plain")
                 .header(CONTENT_LENGTH, content_length)
@@ -65,9 +68,8 @@ pub mod unstable {
 
     #[cfg(feature = "server")]
     impl ruma_common::api::IncomingRequest for Request {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
         type OutgoingResponse = Response;
-        const METADATA: Metadata = METADATA;
 
         fn try_from_http_request<B, S>(
             request: http::Request<B>,
@@ -80,6 +82,8 @@ pub mod unstable {
             const EXPECTED_CONTENT_TYPE: &str = "text/plain";
 
             use ruma_common::api::error::DeserializationError;
+
+            Self::check_request_method(request.method())?;
 
             let content_type = request
                 .headers()
@@ -112,7 +116,7 @@ pub mod unstable {
         }
     }
 
-    /// Response type for the `POST` `rendezvous` endpoint.
+    /// Response type for the `POST` `rendezvous` endpoint from the 2024 version of MSC4108.
     #[derive(Debug, Clone)]
     #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
     pub struct Response {
@@ -139,7 +143,7 @@ pub mod unstable {
 
     #[cfg(feature = "client")]
     impl ruma_common::api::IncomingResponse for Response {
-        type EndpointError = crate::Error;
+        type EndpointError = Error;
 
         fn try_from_http_response<T: AsRef<[u8]>>(
             response: http::Response<T>,
@@ -152,13 +156,13 @@ pub mod unstable {
                 ));
             }
 
-            let get_date = |header: HeaderName| -> Result<SystemTime, FromHttpResponseError<Self::EndpointError>> {
+            let get_date = |header: http::HeaderName| -> Result<SystemTime, FromHttpResponseError<Self::EndpointError>> {
                 let date = response
                     .headers()
                     .get(&header)
                     .ok_or_else(|| HeaderDeserializationError::MissingHeader(header.to_string()))?;
 
-                let date = crate::http_headers::http_date_to_system_time(date)?;
+                let date = ruma_common::http_headers::http_date_to_system_time(date)?;
 
                 Ok(date)
             };
@@ -172,8 +176,7 @@ pub mod unstable {
             let expires = get_date(EXPIRES)?;
             let last_modified = get_date(LAST_MODIFIED)?;
 
-            let body = response.into_body();
-            let body: ResponseBody = serde_json::from_slice(body.as_ref())?;
+            let body: ResponseBody = serde_json::from_slice(response.body().as_ref())?;
 
             Ok(Self { url: body.url, etag, expires, last_modified })
         }
@@ -185,23 +188,80 @@ pub mod unstable {
             self,
         ) -> Result<http::Response<T>, ruma_common::api::error::IntoHttpError> {
             use http::header::{CACHE_CONTROL, PRAGMA};
+            use ruma_common::http_headers::system_time_to_http_date;
 
-            let body = ResponseBody { url: self.url.clone() };
-            let body = serde_json::to_vec(&body)?;
-            let body = ruma_common::serde::slice_to_buf(&body);
+            let body = ResponseBody { url: self.url };
+            let body = ruma_common::serde::json_to_buf(&body)?;
 
-            let expires = crate::http_headers::system_time_to_http_date(&self.expires)?;
-            let last_modified = crate::http_headers::system_time_to_http_date(&self.last_modified)?;
+            let expires = system_time_to_http_date(&self.expires)?;
+            let last_modified = system_time_to_http_date(&self.last_modified)?;
 
             Ok(http::Response::builder()
                 .status(http::StatusCode::OK)
-                .header(CONTENT_TYPE, "application/json")
+                .header(CONTENT_TYPE, ruma_common::http_headers::APPLICATION_JSON)
                 .header(PRAGMA, "no-cache")
                 .header(CACHE_CONTROL, "no-store")
                 .header(ETAG, self.etag)
                 .header(EXPIRES, expires)
                 .header(LAST_MODIFIED, last_modified)
                 .body(body)?)
+        }
+    }
+}
+
+#[cfg(feature = "unstable-msc4388")]
+pub mod unstable_msc4388 {
+    //! `unstable/io.element.msc4388` ([MSC])
+    //!
+    //! [MSC]: https://github.com/matrix-org/matrix-spec-proposals/pull/4388
+    use std::time::Duration;
+
+    use ruma_common::{
+        api::{auth_scheme::AccessTokenOptional, request, response},
+        metadata,
+    };
+
+    metadata! {
+        method: POST,
+        rate_limited: true,
+        authentication: AccessTokenOptional,
+        history: {
+            unstable => "/_matrix/client/unstable/io.element.msc4388/rendezvous",
+        }
+    }
+
+    /// Request type for the `POST` `rendezvous` endpoint.
+    #[request]
+    pub struct Request {
+        /// Data up to maximum size allowed by the server.
+        pub data: String,
+    }
+
+    impl Request {
+        /// Creates a new `Request` with the given content.
+        pub fn new(data: String) -> Self {
+            Self { data }
+        }
+    }
+
+    /// Response type for the `POST` `rendezvous` endpoint.
+    #[response]
+    pub struct Response {
+        /// The ID of the created rendezvous session.
+        pub id: String,
+
+        /// The initial sequence token for the session.
+        pub sequence_token: String,
+
+        /// The time remaining in milliseconds until the session expires.
+        #[serde(with = "ruma_common::serde::duration::ms", rename = "expires_in_ms")]
+        pub expires_in: Duration,
+    }
+
+    impl Response {
+        /// Creates a new `Response` with the given content.
+        pub fn new(id: String, sequence_token: String, expires_in: Duration) -> Self {
+            Self { id, sequence_token, expires_in }
         }
     }
 }

@@ -1,9 +1,9 @@
 //! Types for the [`m.direct`] event.
 //!
-//! [`m.direct`]: https://spec.matrix.org/latest/client-server-api/#mdirect
+//! [`m.direct`]: https://spec.matrix.org/v1.18/client-server-api/#mdirect
 
 use std::{
-    collections::{btree_map, BTreeMap},
+    collections::{BTreeMap, btree_map},
     ops::{Deref, DerefMut},
 };
 
@@ -73,25 +73,25 @@ impl<'a> TryFrom<&'a DirectUserIdentifier> for &'a UserId {
 
 impl From<OwnedUserId> for OwnedDirectUserIdentifier {
     fn from(value: OwnedUserId) -> Self {
-        DirectUserIdentifier::from_borrowed(value.as_str()).to_owned()
+        Self::from_str_unchecked(value.as_str())
     }
 }
 
 impl From<&OwnedUserId> for OwnedDirectUserIdentifier {
     fn from(value: &OwnedUserId) -> Self {
-        DirectUserIdentifier::from_borrowed(value.as_str()).to_owned()
+        Self::from_str_unchecked(value.as_str())
     }
 }
 
 impl From<&UserId> for OwnedDirectUserIdentifier {
     fn from(value: &UserId) -> Self {
-        DirectUserIdentifier::from_borrowed(value.as_str()).to_owned()
+        Self::from_str_unchecked(value.as_str())
     }
 }
 
 impl<'a> From<&'a UserId> for &'a DirectUserIdentifier {
     fn from(value: &'a UserId) -> Self {
-        DirectUserIdentifier::from_borrowed(value.as_str())
+        DirectUserIdentifier::from_borrowed_unchecked(value.as_str())
     }
 }
 
@@ -190,7 +190,9 @@ impl FromIterator<(OwnedDirectUserIdentifier, Vec<OwnedRoomId>)> for DirectEvent
 mod tests {
     use std::collections::BTreeMap;
 
-    use ruma_common::{owned_room_id, user_id, OwnedUserId};
+    use ruma_common::{
+        OwnedUserId, canonical_json::assert_to_canonical_json_eq, owned_room_id, user_id,
+    };
     use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
 
     use super::{DirectEvent, DirectEventContent};
@@ -212,7 +214,7 @@ mod tests {
             alice_mail: mail_rooms,
         });
 
-        assert_eq!(to_json_value(&content).unwrap(), json_data);
+        assert_to_canonical_json_eq!(content, json_data);
     }
 
     #[test]
@@ -243,14 +245,14 @@ mod tests {
 
     #[test]
     fn user_id_conversion() {
-        let alice_direct_uid = DirectUserIdentifier::from_borrowed("@alice:ruma.io");
+        let alice_direct_uid = <&DirectUserIdentifier>::from("@alice:ruma.io");
         let alice_owned_user_id: OwnedUserId = alice_direct_uid
             .to_owned()
             .try_into()
             .expect("@alice:ruma.io should be convertible into a Matrix user ID");
         assert_eq!(alice_direct_uid, alice_owned_user_id);
 
-        let alice_direct_uid_mail = DirectUserIdentifier::from_borrowed("alice@ruma.io");
+        let alice_direct_uid_mail = <&DirectUserIdentifier>::from("alice@ruma.io");
         OwnedUserId::try_from(alice_direct_uid_mail.to_owned())
             .expect_err("alice@ruma.io should not be convertible into a Matrix user ID");
 

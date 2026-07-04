@@ -1,13 +1,13 @@
 //! Types for the [`m.space.child`] event.
 //!
-//! [`m.space.child`]: https://spec.matrix.org/latest/client-server-api/#mspacechild
+//! [`m.space.child`]: https://spec.matrix.org/v1.18/client-server-api/#mspacechild
 
 use std::{cmp::Ordering, ops::Deref};
 
 use ruma_common::{
-    serde::{JsonCastable, JsonObject},
     MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedServerName, OwnedSpaceChildOrder, OwnedUserId,
     RoomId, SpaceChildOrder,
+    serde::{JsonCastable, JsonObject},
 };
 use ruma_macros::{Event, EventContent};
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,19 @@ impl SpaceChildEventContent {
     }
 }
 
+impl PossiblyRedactedSpaceChildEventContent {
+    /// Whether this `PossiblyRedactedSpaceChildEventContent` is valid according to the Matrix
+    /// specification.
+    ///
+    /// The room in the state key of the event should only be considered a child of this space
+    /// if this returns `true`.
+    ///
+    /// Returns `false` if the `via` field is `None`.
+    pub fn is_valid(&self) -> bool {
+        self.via.is_some()
+    }
+}
+
 /// An `m.space.child` event represented as a Stripped State Event with an added `origin_server_ts`
 /// key.
 #[derive(Clone, Debug, Event)]
@@ -119,7 +132,7 @@ impl JsonCastable<JsonObject> for HierarchySpaceChildEvent {}
 /// This trait can be used to sort a slice using `.sort_by(SpaceChildOrd::cmp_space_child)`. It is
 /// also possible to use [`SpaceChildOrdHelper`] to sort the events in a `BTreeMap` or a `BTreeSet`.
 ///
-/// [ordering children within a space]: https://spec.matrix.org/latest/client-server-api/#ordering-of-children-within-a-space
+/// [ordering children within a space]: https://spec.matrix.org/v1.18/client-server-api/#ordering-of-children-within-a-space
 pub trait SpaceChildOrd {
     #[doc(hidden)]
     fn space_child_ord_fields(&self) -> SpaceChildOrdFields<'_>;
@@ -127,7 +140,7 @@ pub trait SpaceChildOrd {
     /// Return an [`Ordering`] between `self` and `other`, using the algorithm for [ordering
     /// children within a space].
     ///
-    /// [ordering children within a space]: https://spec.matrix.org/latest/client-server-api/#ordering-of-children-within-a-space
+    /// [ordering children within a space]: https://spec.matrix.org/v1.18/client-server-api/#ordering-of-children-within-a-space
     fn cmp_space_child(&self, other: &impl SpaceChildOrd) -> Ordering {
         self.space_child_ord_fields().cmp(&other.space_child_ord_fields())
     }
@@ -136,7 +149,7 @@ pub trait SpaceChildOrd {
 /// Fields necessary to implement `Ord` for space child events using the algorithm for [ordering
 /// children within a space].
 ///
-/// [ordering children within a space]: https://spec.matrix.org/latest/client-server-api/#ordering-of-children-within-a-space
+/// [ordering children within a space]: https://spec.matrix.org/v1.18/client-server-api/#ordering-of-children-within-a-space
 #[doc(hidden)]
 #[derive(PartialEq, Eq)]
 pub struct SpaceChildOrdFields<'a> {
@@ -252,7 +265,7 @@ impl SpaceChildOrd for HierarchySpaceChildEvent {
 ///
 /// This type can be use with `BTreeMap` or `BTreeSet` to order space child events.
 ///
-/// [ordering children within a space]: https://spec.matrix.org/latest/client-server-api/#ordering-of-children-within-a-space
+/// [ordering children within a space]: https://spec.matrix.org/v1.18/client-server-api/#ordering-of-children-within-a-space
 #[derive(Debug, Clone)]
 #[allow(clippy::exhaustive_structs)]
 pub struct SpaceChildOrdHelper<T: SpaceChildOrd>(pub T);
@@ -289,12 +302,13 @@ impl<T: SpaceChildOrd> Deref for SpaceChildOrdHelper<T> {
 mod tests {
     use std::{collections::BTreeSet, iter::repeat_n};
 
-    use js_int::{uint, UInt};
+    use js_int::{UInt, uint};
     use ruma_common::{
-        owned_server_name, owned_user_id, room_id, server_name, MilliSecondsSinceUnixEpoch, RoomId,
-        SpaceChildOrder,
+        MilliSecondsSinceUnixEpoch, OwnedRoomId, SpaceChildOrder,
+        canonical_json::assert_to_canonical_json_eq, owned_room_id, owned_server_name,
+        owned_user_id, server_name,
     };
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use serde_json::{from_value as from_json_value, json};
 
     use super::{
         HierarchySpaceChildEvent, SpaceChildEventContent, SpaceChildOrd, SpaceChildOrdHelper,
@@ -303,26 +317,25 @@ mod tests {
     #[test]
     fn space_child_serialization() {
         let content = SpaceChildEventContent {
-            via: vec![server_name!("example.com").to_owned()],
+            via: vec![owned_server_name!("example.com")],
             order: Some(SpaceChildOrder::parse("uwu").unwrap()),
             suggested: false,
         };
 
-        let json = json!({
-            "via": ["example.com"],
-            "order": "uwu",
-        });
-
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(
+            content,
+            json!({
+                "via": ["example.com"],
+                "order": "uwu",
+            }),
+        );
     }
 
     #[test]
     fn space_child_empty_serialization() {
         let content = SpaceChildEventContent { via: vec![], order: None, suggested: false };
 
-        let json = json!({ "via": [] });
-
-        assert_eq!(to_json_value(&content).unwrap(), json);
+        assert_to_canonical_json_eq!(content, json!({ "via": [] }));
     }
 
     #[test]
@@ -406,7 +419,7 @@ mod tests {
 
     /// Construct a [`HierarchySpaceChildEvent`] with the given state key, order and timestamp.
     fn hierarchy_space_child_event(
-        state_key: &RoomId,
+        state_key: OwnedRoomId,
         order: Option<&str>,
         origin_server_ts: UInt,
     ) -> HierarchySpaceChildEvent {
@@ -416,7 +429,7 @@ mod tests {
         HierarchySpaceChildEvent {
             content,
             sender: owned_user_id!("@alice:example.org"),
-            state_key: state_key.to_owned(),
+            state_key,
             origin_server_ts: MilliSecondsSinceUnixEpoch(origin_server_ts),
         }
     }
@@ -425,24 +438,30 @@ mod tests {
     fn space_child_ord_spec_example() {
         // Reproduce the example from the spec.
         let child_a = hierarchy_space_child_event(
-            room_id!("!a:example.org"),
+            owned_room_id!("!a:example.org"),
             Some("aaaa"),
             uint!(1_640_141_000),
         );
         let child_b = hierarchy_space_child_event(
-            room_id!("!b:example.org"),
+            owned_room_id!("!b:example.org"),
             Some(" "),
             uint!(1_640_341_000),
         );
         let child_c = hierarchy_space_child_event(
-            room_id!("!c:example.org"),
+            owned_room_id!("!c:example.org"),
             Some("first"),
             uint!(1_640_841_000),
         );
-        let child_d =
-            hierarchy_space_child_event(room_id!("!d:example.org"), None, uint!(1_640_741_000));
-        let child_e =
-            hierarchy_space_child_event(room_id!("!e:example.org"), None, uint!(1_640_641_000));
+        let child_d = hierarchy_space_child_event(
+            owned_room_id!("!d:example.org"),
+            None,
+            uint!(1_640_741_000),
+        );
+        let child_e = hierarchy_space_child_event(
+            owned_room_id!("!e:example.org"),
+            None,
+            uint!(1_640_641_000),
+        );
 
         let events =
             [child_a.clone(), child_b.clone(), child_c.clone(), child_d.clone(), child_e.clone()];
@@ -479,21 +498,30 @@ mod tests {
     fn space_child_ord_other_example() {
         // We also check invalid order and state key comparison here.
         let child_a = hierarchy_space_child_event(
-            room_id!("!a:example.org"),
+            owned_room_id!("!a:example.org"),
             Some("🔝"),
             uint!(1_640_141_000),
         );
         let child_b = hierarchy_space_child_event(
-            room_id!("!b:example.org"),
+            owned_room_id!("!b:example.org"),
             Some(" "),
             uint!(1_640_341_000),
         );
-        let child_c =
-            hierarchy_space_child_event(room_id!("!c:example.org"), None, uint!(1_640_841_000));
-        let child_d =
-            hierarchy_space_child_event(room_id!("!d:example.org"), None, uint!(1_640_741_000));
-        let child_e =
-            hierarchy_space_child_event(room_id!("!e:example.org"), None, uint!(1_640_741_000));
+        let child_c = hierarchy_space_child_event(
+            owned_room_id!("!c:example.org"),
+            None,
+            uint!(1_640_841_000),
+        );
+        let child_d = hierarchy_space_child_event(
+            owned_room_id!("!d:example.org"),
+            None,
+            uint!(1_640_741_000),
+        );
+        let child_e = hierarchy_space_child_event(
+            owned_room_id!("!e:example.org"),
+            None,
+            uint!(1_640_741_000),
+        );
 
         let mut events =
             [child_a.clone(), child_b.clone(), child_c.clone(), child_d.clone(), child_e.clone()];

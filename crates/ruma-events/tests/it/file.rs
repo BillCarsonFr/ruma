@@ -3,29 +3,30 @@
 use assert_matches2::assert_matches;
 use js_int::uint;
 use ruma_common::{
-    mxc_uri, owned_event_id,
-    serde::{Base64, CanBeEmpty},
     MilliSecondsSinceUnixEpoch,
+    canonical_json::assert_to_canonical_json_eq,
+    owned_event_id, owned_mxc_uri,
+    serde::{Base64, CanBeEmpty},
 };
 use ruma_events::{
-    file::{EncryptedContentInit, FileEventContent},
-    message::TextContentBlock,
-    relation::InReplyTo,
-    room::{message::Relation, JsonWebKeyInit},
     AnyMessageLikeEvent, MessageLikeEvent,
+    file::{EncryptedContent, FileEventContent},
+    message::TextContentBlock,
+    relation::Reply,
+    room::{EncryptedFileHash, V2EncryptedFileInfo, message::Relation},
 };
-use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+use serde_json::{from_value as from_json_value, json};
 
 #[test]
 fn plain_content_serialization() {
     let event_content = FileEventContent::plain_with_plain_text(
         "Upload: my_file.txt",
-        mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+        owned_mxc_uri!("mxc://notareal.hs/abcdef"),
         "my_file.txt".to_owned(),
     );
 
-    assert_eq!(
-        to_json_value(&event_content).unwrap(),
+    assert_to_canonical_json_eq!(
+        event_content,
         json!({
             "org.matrix.msc1767.text": [
                 { "body": "Upload: my_file.txt" },
@@ -42,30 +43,23 @@ fn plain_content_serialization() {
 fn encrypted_content_serialization() {
     let event_content = FileEventContent::encrypted_with_plain_text(
         "Upload: my_file.txt",
-        mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+        owned_mxc_uri!("mxc://notareal.hs/abcdef"),
         "my_file.txt".to_owned(),
-        EncryptedContentInit {
-            key: JsonWebKeyInit {
-                kty: "oct".to_owned(),
-                key_ops: vec!["encrypt".to_owned(), "decrypt".to_owned()],
-                alg: "A256CTR".to_owned(),
-                k: Base64::parse("TLlG_OpX807zzQuuwv4QZGJ21_u7weemFGYJFszMn9A").unwrap(),
-                ext: true,
-            }
+        EncryptedContent::new(
+            V2EncryptedFileInfo::new(
+                Base64::parse("TLlG_OpX807zzQuuwv4QZGJ21_u7weemFGYJFszMn9A").unwrap(),
+                Base64::parse("S22dq3NAX8wAAAAAAAAAAA").unwrap(),
+            )
             .into(),
-            iv: Base64::parse("S22dq3NAX8wAAAAAAAAAAA").unwrap(),
-            hashes: [(
-                "sha256".to_owned(),
+            std::iter::once(EncryptedFileHash::Sha256(
                 Base64::parse("aWOHudBnDkJ9IwaR1Nd8XKoI7DOrqDTwt6xDPfVGN6Q").unwrap(),
-            )]
-            .into(),
-            v: "v2".to_owned(),
-        }
-        .into(),
+            ))
+            .collect(),
+        ),
     );
 
-    assert_eq!(
-        to_json_value(&event_content).unwrap(),
+    assert_to_canonical_json_eq!(
+        event_content,
         json!({
             "org.matrix.msc1767.text": [
                 { "body": "Upload: my_file.txt" },
@@ -75,7 +69,7 @@ fn encrypted_content_serialization() {
                 "name": "my_file.txt",
                 "key": {
                     "kty": "oct",
-                    "key_ops": ["encrypt", "decrypt"],
+                    "key_ops": ["decrypt", "encrypt"],
                     "alg": "A256CTR",
                     "k": "TLlG_OpX807zzQuuwv4QZGJ21_u7weemFGYJFszMn9A",
                     "ext": true
@@ -94,17 +88,16 @@ fn encrypted_content_serialization() {
 fn file_event_serialization() {
     let mut content = FileEventContent::plain(
         TextContentBlock::html("Upload: my_file.txt", "Upload: <strong>my_file.txt</strong>"),
-        mxc_uri!("mxc://notareal.hs/abcdef").to_owned(),
+        owned_mxc_uri!("mxc://notareal.hs/abcdef"),
         "my_file.txt".to_owned(),
     );
     content.file.mimetype = Some("text/plain".to_owned());
     content.file.size = Some(uint!(774));
-    content.relates_to = Some(Relation::Reply {
-        in_reply_to: InReplyTo::new(owned_event_id!("$replyevent:example.com")),
-    });
+    content.relates_to =
+        Some(Relation::Reply(Reply::with_event_id(owned_event_id!("$replyevent:example.com"))));
 
-    assert_eq!(
-        to_json_value(&content).unwrap(),
+    assert_to_canonical_json_eq!(
+        content,
         json!({
             "org.matrix.msc1767.text": [
                 { "mimetype": "text/html", "body": "Upload: <strong>my_file.txt</strong>" },

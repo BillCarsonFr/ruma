@@ -5,17 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomidmembers
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3roomsroomidmembers
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
-        OwnedRoomId,
     };
     use ruma_events::room::member::{MembershipState, RoomMemberEvent};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
@@ -23,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/members",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/members",
         }
-    };
+    }
 
     /// Request type for the `get_member_events` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room to get the member events for.
         #[ruma_api(path)]
@@ -58,7 +58,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_member_events` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// A list of member events.
         pub chunk: Vec<Raw<RoomMemberEvent>>,

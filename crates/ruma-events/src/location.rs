@@ -140,11 +140,7 @@ impl ZoomLevel {
 
     /// Creates a new `ZoomLevel` with the given value.
     pub fn new(value: u8) -> Option<Self> {
-        if value > Self::MAX {
-            None
-        } else {
-            Some(Self(value.into()))
-        }
+        if value > Self::MAX { None } else { Some(Self(value.into())) }
     }
 
     /// The value of this `ZoomLevel`.
@@ -179,8 +175,8 @@ impl AssetContent {
 
 /// The type of an asset.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, StringEnum)]
-#[ruma_enum(rename_all = "m.snake_case")]
+#[derive(Clone, Default, StringEnum)]
+#[ruma_enum(rename_all(prefix = "m.", rule = "snake_case"))]
 #[non_exhaustive]
 pub enum AssetType {
     /// The asset is the sender of the event.

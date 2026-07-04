@@ -5,16 +5,16 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3keyssignaturesupload
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3keyssignaturesupload
 
     use std::collections::BTreeMap;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedDeviceId, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
         encryption::{CrossSigningKey, DeviceKeys},
         metadata,
         serde::{Raw, StringEnum},
-        OwnedDeviceId, OwnedUserId,
     };
     use serde::{Deserialize, Serialize};
     use serde_json::value::RawValue as RawJsonValue;
@@ -22,7 +22,7 @@ pub mod v3 {
     pub use super::iter::SignedKeysIter;
     use crate::PrivOwnedStr;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
@@ -30,10 +30,10 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/keys/signatures/upload",
             1.1 => "/_matrix/client/v3/keys/signatures/upload",
         }
-    };
+    }
 
     /// Request type for the `upload_signatures` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// Signed keys.
         #[ruma_api(body)]
@@ -41,7 +41,7 @@ pub mod v3 {
     }
 
     /// Response type for the `upload_signatures` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// Signature processing failures.
@@ -107,9 +107,9 @@ pub mod v3 {
 
     /// Error code for signed key processing failures.
     #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-    #[derive(Clone, PartialEq, Eq, StringEnum)]
+    #[derive(Clone, StringEnum)]
     #[non_exhaustive]
-    #[ruma_enum(rename_all = "M_MATRIX_ERROR_CASE")]
+    #[ruma_enum(rename_all(prefix = "M_", rule = "SCREAMING_SNAKE_CASE"))]
     pub enum FailureErrorCode {
         /// The signature is invalid.
         InvalidSignature,

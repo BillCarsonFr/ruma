@@ -5,20 +5,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3keysupload
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3keysupload
 
     use std::collections::BTreeMap;
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        OneTimeKeyAlgorithm, OwnedOneTimeKeyId,
+        api::{auth_scheme::AccessToken, request, response},
         encryption::{DeviceKeys, OneTimeKey},
         metadata,
         serde::Raw,
-        OneTimeKeyAlgorithm, OwnedOneTimeKeyId,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
@@ -26,10 +26,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/keys/upload",
             1.1 => "/_matrix/client/v3/keys/upload",
         }
-    };
+    }
 
     /// Request type for the `upload_keys` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[derive(Default)]
     pub struct Request {
         /// Identity keys for the device.
@@ -48,7 +48,7 @@ pub mod v3 {
     }
 
     /// Response type for the `upload_keys` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// For each key algorithm, the number of unclaimed one-time keys of that
         /// type currently held on the server for this device.

@@ -5,17 +5,17 @@
 pub mod v1 {
     //! `v1` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv1room_summaryroomidoralias
 
     use ruma_common::{
-        api::{request, Metadata},
+        OwnedRoomOrAliasId, OwnedServerName,
+        api::{auth_scheme::AccessTokenOptional, request},
         metadata,
         room::RoomSummary,
-        OwnedRoomOrAliasId, OwnedServerName,
     };
     use ruma_events::room::member::MembershipState;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessTokenOptional,
@@ -23,10 +23,10 @@ pub mod v1 {
             unstable => "/_matrix/client/unstable/im.nheko.summary/rooms/{room_id_or_alias}/summary",
             1.15 => "/_matrix/client/v1/room_summary/{room_id_or_alias}",
         }
-    };
+    }
 
     /// Request type for the `get_summary` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// Alias or ID of the room to be summarized.
         #[ruma_api(path)]
@@ -91,7 +91,7 @@ pub mod v1 {
             let body = ResponseSerHelper { summary: self.summary, membership: self.membership };
 
             http::Response::builder()
-                .header(http::header::CONTENT_TYPE, "application/json")
+                .header(http::header::CONTENT_TYPE, ruma_common::http_headers::APPLICATION_JSON)
                 .body(ruma_common::serde::json_to_buf(&body)?)
                 .map_err(Into::into)
         }
@@ -99,7 +99,7 @@ pub mod v1 {
 
     #[cfg(feature = "client")]
     impl ruma_common::api::IncomingResponse for Response {
-        type EndpointError = crate::Error;
+        type EndpointError = ruma_common::api::error::Error;
 
         fn try_from_http_response<T: AsRef<[u8]>>(
             response: http::Response<T>,

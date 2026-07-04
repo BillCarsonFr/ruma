@@ -5,23 +5,21 @@
 pub mod v1 {
     //! `/v1/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/application-service-api/#get_matrixappv1thirdpartylocation
+    //! [spec]: https://spec.matrix.org/v1.18/application-service-api/#get_matrixappv1thirdpartylocation
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedRoomAliasId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         thirdparty::Location,
-        OwnedRoomAliasId,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
-        history: {
-            1.0 => "/_matrix/app/v1/thirdparty/location",
-        }
-    };
+        path: "/_matrix/app/v1/thirdparty/location",
+    }
 
     /// Request type for the `get_location_for_room_alias` endpoint.
     #[request]

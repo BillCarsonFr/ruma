@@ -1,6 +1,6 @@
 use assert_matches2::assert_matches;
 use js_int::uint;
-use ruma_common::{serde::CanBeEmpty, MilliSecondsSinceUnixEpoch};
+use ruma_common::{MilliSecondsSinceUnixEpoch, serde::CanBeEmpty};
 use ruma_events::{AnyMessageLikeEvent, MessageLikeEvent, StickyDurationMs, StickyObject};
 use serde_json::{from_value as from_json_value, json};
 

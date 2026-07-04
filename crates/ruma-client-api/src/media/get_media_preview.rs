@@ -5,16 +5,17 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixmediav3preview_url
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixmediav3preview_url
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, MilliSecondsSinceUnixEpoch,
+        MilliSecondsSinceUnixEpoch,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
     use serde::Serialize;
-    use serde_json::value::{to_raw_value as to_raw_json_value, RawValue as RawJsonValue};
+    use serde_json::value::{RawValue as RawJsonValue, to_raw_value as to_raw_json_value};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -23,10 +24,10 @@ pub mod v3 {
             1.1 => "/_matrix/media/v3/preview_url",
             1.11 => deprecated,
         }
-    };
+    }
 
     /// Request type for the `get_media_preview` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     #[deprecated = "\
       Since Matrix 1.11, clients should use `authenticated_media::get_media_preview::v1::Request` \
       instead if the homeserver supports it.\
@@ -43,7 +44,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_media_preview` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {
         /// OpenGraph-like data for the URL.
@@ -86,7 +87,7 @@ pub mod v3 {
         use assert_matches2::assert_matches;
         use serde_json::{
             from_value as from_json_value, json,
-            value::{to_raw_value as to_raw_json_value, RawValue as RawJsonValue},
+            value::{RawValue as RawJsonValue, to_raw_value as to_raw_json_value},
         };
 
         // Since BTreeMap<String, Box<RawJsonValue>> deserialization doesn't seem to

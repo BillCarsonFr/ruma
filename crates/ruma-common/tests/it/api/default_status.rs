@@ -3,18 +3,18 @@
 
 use http::StatusCode;
 use ruma_common::{
-    api::{request, response, Metadata, OutgoingResponse as _},
+    api::{OutgoingResponse as _, auth_scheme::NoAuthentication, request, response},
     metadata,
 };
 
-const METADATA: Metadata = metadata! {
+metadata! {
     method: GET,
     rate_limited: false,
-    authentication: None,
+    authentication: NoAuthentication,
     history: {
         unstable => "/_matrix/my/endpoint",
     }
-};
+}
 
 /// Request type for the `default_status` endpoint.
 #[request]

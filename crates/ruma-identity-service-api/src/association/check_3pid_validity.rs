@@ -5,24 +5,24 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#get_matrixidentityv23pidgetvalidated3pid
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#get_matrixidentityv23pidgetvalidated3pid
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedClientSecret, OwnedSessionId,
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         thirdparty::Medium,
-        OwnedClientSecret, OwnedSessionId,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/3pid/getValidated3pid/",
         }
-    };
+    }
 
     /// Request type for the `check_3pid_validity` endpoint.
     #[request]

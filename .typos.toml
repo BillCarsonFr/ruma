@@ -2,10 +2,14 @@
 # Remove this once base64 gets correctly ignored by typos
 # Or if we're able to ignore certain lines.
 Hd = "Hd"
+Iz = "Iz"
 NAX = "NAX"
 Nd = "Nd"
 Pn = "Pn"
 Wya = "Wya"
+
+# Short for "serialize".
+Ser = "Ser"
 
 # all of these are valid words, but should never appear in this repo
 sing = "sign"

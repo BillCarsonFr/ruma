@@ -6,20 +6,20 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keysversionversion
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3room_keysversionversion
 
     use js_int::UInt;
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
         serde::Raw,
     };
-    use serde::{ser, Deserialize, Deserializer, Serialize};
-    use serde_json::value::{to_raw_value as to_raw_json_value, RawValue as RawJsonValue};
+    use serde::{Deserialize, Deserializer, Serialize, ser};
+    use serde_json::value::{RawValue as RawJsonValue, to_raw_value as to_raw_json_value};
 
     use crate::backup::BackupAlgorithm;
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -27,10 +27,10 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/room_keys/version/{version}",
             1.1 => "/_matrix/client/v3/room_keys/version/{version}",
         }
-    };
+    }
 
     /// Request type for the `get_backup_info` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The backup version to retrieve info from.
         #[ruma_api(path)]
@@ -38,7 +38,7 @@ pub mod v3 {
     }
 
     /// Response type for the `get_backup_info` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[ruma_api(manual_body_serde)]
     pub struct Response {
         /// The algorithm used for storing backups.

@@ -5,24 +5,24 @@
 pub mod v2 {
     //! `/v2/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/identity-service-api/#post_matrixidentityv23pidbind
+    //! [spec]: https://spec.matrix.org/v1.18/identity-service-api/#post_matrixidentityv23pidbind
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata,
-        thirdparty::Medium,
         MilliSecondsSinceUnixEpoch, OwnedClientSecret, OwnedSessionId, OwnedUserId,
         ServerSignatures,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
+        thirdparty::Medium,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
         history: {
             1.0 => "/_matrix/identity/v2/3pid/bind",
         }
-    };
+    }
 
     /// Request type for the `bind_3pid` endpoint.
     #[request]

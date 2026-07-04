@@ -5,14 +5,15 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomidaliases
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#get_matrixclientv3roomsroomidaliases
 
     use ruma_common::{
-        api::{request, response, Metadata},
-        metadata, OwnedRoomAliasId, OwnedRoomId,
+        OwnedRoomAliasId, OwnedRoomId,
+        api::{auth_scheme::AccessToken, request, response},
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: GET,
         rate_limited: true,
         authentication: AccessToken,
@@ -21,10 +22,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/rooms/{room_id}/aliases",
             1.1 => "/_matrix/client/v3/rooms/{room_id}/aliases",
         }
-    };
+    }
 
     /// Request type for the `aliases` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The room ID to get aliases of.
         #[ruma_api(path)]
@@ -32,7 +33,7 @@ pub mod v3 {
     }
 
     /// Response type for the `aliases` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// The server's local aliases on the room.
         pub aliases: Vec<OwnedRoomAliasId>,

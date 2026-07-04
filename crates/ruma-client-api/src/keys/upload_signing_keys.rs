@@ -5,10 +5,10 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3keysdevice_signingupload
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3keysdevice_signingupload
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         encryption::CrossSigningKey,
         metadata,
         serde::Raw,
@@ -16,7 +16,7 @@ pub mod v3 {
 
     use crate::uiaa::{AuthData, UiaaResponse};
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: false,
         authentication: AccessToken,
@@ -24,7 +24,7 @@ pub mod v3 {
             unstable => "/_matrix/client/unstable/keys/device_signing/upload",
             1.1 => "/_matrix/client/v3/keys/device_signing/upload",
         }
-    };
+    }
 
     /// Request type for the `upload_signing_keys` endpoint.
     #[request(error = UiaaResponse)]

@@ -5,16 +5,16 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#delete_matrixclientv3room_keysversionversion
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#delete_matrixclientv3room_keysversionversion
     //!
     //! This deletes a backup version and its room keys.
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        api::{auth_scheme::AccessToken, request, response},
         metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: DELETE,
         rate_limited: true,
         authentication: AccessToken,
@@ -23,10 +23,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/room_keys/version/{version}",
             1.1 => "/_matrix/client/v3/room_keys/version/{version}",
         }
-    };
+    }
 
     /// Request type for the `delete_backup_version` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// The backup version to delete.
         #[ruma_api(path)]
@@ -34,7 +34,7 @@ pub mod v3 {
     }
 
     /// Response type for the `delete_backup_version` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     #[derive(Default)]
     pub struct Response {}
 

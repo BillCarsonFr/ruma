@@ -1,6 +1,6 @@
 //! Types for the [`m.reaction`] event.
 //!
-//! [`m.reaction`]: https://spec.matrix.org/latest/client-server-api/#mreaction
+//! [`m.reaction`]: https://spec.matrix.org/v1.18/client-server-api/#mreaction
 
 use ruma_macros::EventContent;
 use serde::{Deserialize, Serialize};
@@ -37,8 +37,8 @@ impl From<Annotation> for ReactionEventContent {
 #[cfg(test)]
 mod tests {
     use assert_matches2::assert_matches;
-    use ruma_common::{owned_event_id, serde::Raw};
-    use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
+    use ruma_common::{canonical_json::assert_to_canonical_json_eq, owned_event_id, serde::Raw};
+    use serde_json::{from_value as from_json_value, json};
 
     use super::ReactionEventContent;
     use crate::relation::Annotation;
@@ -68,8 +68,8 @@ mod tests {
             "🏠".to_owned(),
         ));
 
-        assert_eq!(
-            to_json_value(&content).unwrap(),
+        assert_to_canonical_json_eq!(
+            content,
             json!({
                 "m.relates_to": {
                     "rel_type": "m.annotation",

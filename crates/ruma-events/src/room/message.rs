@@ -1,27 +1,26 @@
 //! Types for the [`m.room.message`] event.
 //!
-//! [`m.room.message`]: https://spec.matrix.org/latest/client-server-api/#mroommessage
+//! [`m.room.message`]: https://spec.matrix.org/v1.18/client-server-api/#mroommessage
 
 use std::borrow::Cow;
 
 use as_variant::as_variant;
 use ruma_common::{
-    serde::{JsonObject, StringEnum},
     EventId, OwnedEventId, UserId,
+    serde::{JsonObject, StringEnum},
 };
 #[cfg(feature = "html")]
-use ruma_html::{sanitize_html, HtmlSanitizerMode, RemoveReplyFallback};
+use ruma_html::{HtmlSanitizerMode, RemoveReplyFallback, sanitize_html};
 use ruma_macros::EventContent;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value as JsonValue;
 use tracing::warn;
 
 #[cfg(feature = "html")]
 use self::sanitize::remove_plain_reply_fallback;
-use crate::{
-    relation::{InReplyTo, Replacement, Thread},
-    Mentions, PrivOwnedStr,
-};
+#[cfg(feature = "unstable-msc4471")]
+use crate::stream::StreamDescriptor;
+use crate::{Mentions, PrivOwnedStr, relation::Thread};
 
 mod audio;
 mod content_serde;
@@ -85,25 +84,42 @@ pub struct RoomMessageEventContent {
 
     /// Information about [related messages].
     ///
-    /// [related messages]: https://spec.matrix.org/latest/client-server-api/#forming-relationships-between-events
+    /// [related messages]: https://spec.matrix.org/v1.18/client-server-api/#forming-relationships-between-events
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub relates_to: Option<Relation<RoomMessageEventContentWithoutRelation>>,
 
     /// The [mentions] of this event.
     ///
     /// This should always be set to avoid triggering the legacy mention push rules. It is
-    /// recommended to use [`Self::set_mentions()`] to set this field, that will take care of
-    /// populating the fields correctly if this is a replacement.
+    /// recommended to modify this field only before calling a method that adds a relation. For
+    /// example, [`make_replacement()`](Self::make_replacement) needs to know all the mentions
+    /// beforehand to avoid re-triggering notifications for users that were already mentioned in
+    /// the original event.
     ///
-    /// [mentions]: https://spec.matrix.org/latest/client-server-api/#user-and-room-mentions
+    /// [mentions]: https://spec.matrix.org/v1.18/client-server-api/#user-and-room-mentions
     #[serde(rename = "m.mentions", skip_serializing_if = "Option::is_none")]
     pub mentions: Option<Mentions>,
+
+    /// A descriptor advertising a live event stream for this message.
+    ///
+    /// This uses the unstable prefix defined in [MSC4471].
+    ///
+    /// [MSC4471]: https://github.com/matrix-org/matrix-spec-proposals/pull/4471
+    #[cfg(feature = "unstable-msc4471")]
+    #[serde(rename = "org.matrix.msc4471.stream", skip_serializing_if = "Option::is_none")]
+    pub stream: Option<StreamDescriptor>,
 }
 
 impl RoomMessageEventContent {
     /// Create a `RoomMessageEventContent` with the given `MessageType`.
     pub fn new(msgtype: MessageType) -> Self {
-        Self { msgtype, relates_to: None, mentions: None }
+        Self {
+            msgtype,
+            relates_to: None,
+            mentions: None,
+            #[cfg(feature = "unstable-msc4471")]
+            stream: None,
+        }
     }
 
     /// A constructor to create a plain text message.
@@ -161,7 +177,7 @@ impl RoomMessageEventContent {
     ///
     /// If `AddMentions::Yes` is used, the `sender` in the metadata is added as a user mention.
     ///
-    /// [rich reply]: https://spec.matrix.org/latest/client-server-api/#rich-replies
+    /// [rich reply]: https://spec.matrix.org/v1.18/client-server-api/#rich-replies
     #[track_caller]
     pub fn make_reply_to<'a>(
         self,
@@ -185,7 +201,7 @@ impl RoomMessageEventContent {
     ///
     /// If `AddMentions::Yes` is used, the `sender` in the metadata is added as a user mention.
     ///
-    /// [thread]: https://spec.matrix.org/latest/client-server-api/#threading
+    /// [thread]: https://spec.matrix.org/v1.18/client-server-api/#threading
     pub fn make_for_thread<'a>(
         self,
         metadata: impl Into<ReplyMetadata<'a>>,
@@ -212,52 +228,10 @@ impl RoomMessageEventContent {
     ///
     /// Panics if `self` has a `formatted_body` with a format other than HTML.
     ///
-    /// [replacement]: https://spec.matrix.org/latest/client-server-api/#event-replacements
+    /// [replacement]: https://spec.matrix.org/v1.18/client-server-api/#event-replacements
     #[track_caller]
     pub fn make_replacement(self, metadata: impl Into<ReplacementMetadata>) -> Self {
         self.without_relation().make_replacement(metadata)
-    }
-
-    /// Set the [mentions] of this event.
-    ///
-    /// If this event is a replacement, it will update the mentions both in the `content` and the
-    /// `m.new_content` so only new mentions will trigger a notification. As such, this needs to be
-    /// called after [`Self::make_replacement()`].
-    ///
-    /// It is not recommended to call this method after one that sets mentions automatically, like
-    /// [`Self::make_reply_to()`] as these will be overwritten. [`Self::add_mentions()`] should be
-    /// used instead.
-    ///
-    /// [mentions]: https://spec.matrix.org/latest/client-server-api/#user-and-room-mentions
-    #[deprecated = "Call add_mentions before adding the relation instead."]
-    pub fn set_mentions(mut self, mentions: Mentions) -> Self {
-        if let Some(Relation::Replacement(replacement)) = &mut self.relates_to {
-            let old_mentions = &replacement.new_content.mentions;
-
-            let new_mentions = if let Some(old_mentions) = old_mentions {
-                let mut new_mentions = Mentions::new();
-
-                new_mentions.user_ids = mentions
-                    .user_ids
-                    .iter()
-                    .filter(|u| !old_mentions.user_ids.contains(*u))
-                    .cloned()
-                    .collect();
-
-                new_mentions.room = mentions.room && !old_mentions.room;
-
-                new_mentions
-            } else {
-                mentions.clone()
-            };
-
-            replacement.new_content.mentions = Some(mentions);
-            self.mentions = Some(new_mentions);
-        } else {
-            self.mentions = Some(mentions);
-        }
-
-        self
     }
 
     /// Add the given [mentions] to this event.
@@ -269,7 +243,7 @@ impl RoomMessageEventContent {
     /// This should be called before methods that add a relation, like [`Self::make_reply_to()`] and
     /// [`Self::make_replacement()`], for the mentions to be correctly set.
     ///
-    /// [mentions]: https://spec.matrix.org/latest/client-server-api/#user-and-room-mentions
+    /// [mentions]: https://spec.matrix.org/v1.18/client-server-api/#user-and-room-mentions
     pub fn add_mentions(mut self, mentions: Mentions) -> Self {
         self.mentions.get_or_insert_with(Mentions::new).add(mentions);
         self
@@ -289,10 +263,21 @@ impl RoomMessageEventContent {
     }
 
     /// Apply the given new content from a [`Replacement`] to this message.
+    ///
+    /// [`Replacement`]: crate::relation::Replacement
     pub fn apply_replacement(&mut self, new_content: RoomMessageEventContentWithoutRelation) {
-        let RoomMessageEventContentWithoutRelation { msgtype, mentions } = new_content;
+        let RoomMessageEventContentWithoutRelation {
+            msgtype,
+            mentions,
+            #[cfg(feature = "unstable-msc4471")]
+            stream,
+        } = new_content;
         self.msgtype = msgtype;
         self.mentions = mentions;
+        #[cfg(feature = "unstable-msc4471")]
+        {
+            self.stream = stream;
+        }
     }
 
     /// Sanitize this message.
@@ -305,15 +290,15 @@ impl RoomMessageEventContent {
     ///
     /// This method is only effective on text, notice and emote messages.
     ///
-    /// [tags and attributes]: https://spec.matrix.org/latest/client-server-api/#mroommessage-msgtypes
-    /// [rich reply]: https://spec.matrix.org/latest/client-server-api/#rich-replies
+    /// [tags and attributes]: https://spec.matrix.org/v1.18/client-server-api/#mroommessage-msgtypes
+    /// [rich reply]: https://spec.matrix.org/v1.18/client-server-api/#rich-replies
     #[cfg(feature = "html")]
     pub fn sanitize(
         &mut self,
         mode: HtmlSanitizerMode,
         remove_reply_fallback: RemoveReplyFallback,
     ) {
-        let remove_reply_fallback = if matches!(self.relates_to, Some(Relation::Reply { .. })) {
+        let remove_reply_fallback = if matches!(self.relates_to, Some(Relation::Reply(_))) {
             remove_reply_fallback
         } else {
             RemoveReplyFallback::No
@@ -345,7 +330,7 @@ pub enum ForwardThread {
     /// This should be set if your client doesn't render threads (see the [info
     /// box for clients which are acutely aware of threads]).
     ///
-    /// [info box for clients which are acutely aware of threads]: https://spec.matrix.org/latest/client-server-api/#fallback-for-unthreaded-clients
+    /// [info box for clients which are acutely aware of threads]: https://spec.matrix.org/v1.18/client-server-api/#fallback-for-unthreaded-clients
     Yes,
 
     /// Create a reply in the main conversation even if the original message is in a thread.
@@ -379,14 +364,14 @@ pub enum ReplyWithinThread {
     ///
     /// Create a [reply within the thread].
     ///
-    /// [reply within the thread]: https://spec.matrix.org/latest/client-server-api/#replies-within-threads
+    /// [reply within the thread]: https://spec.matrix.org/v1.18/client-server-api/#replies-within-threads
     Yes,
 
     /// This is not a reply.
     ///
     /// Create a regular message in the thread, with a [fallback for unthreaded clients].
     ///
-    /// [fallback for unthreaded clients]: https://spec.matrix.org/latest/client-server-api/#fallback-for-unthreaded-clients
+    /// [fallback for unthreaded clients]: https://spec.matrix.org/v1.18/client-server-api/#fallback-for-unthreaded-clients
     No,
 }
 
@@ -443,13 +428,13 @@ pub enum MessageType {
     /// A custom message.
     #[doc(hidden)]
     #[serde(untagged)]
-    _Custom(CustomEventContent),
+    _Custom(CustomMessageContent),
 }
 
 impl MessageType {
     /// Creates a new `MessageType`.
     ///
-    /// The `msgtype` and `body` are required fields as defined by [the `m.room.message` spec](https://spec.matrix.org/latest/client-server-api/#mroommessage).
+    /// The `msgtype` and `body` are required fields as defined by [the `m.room.message` spec](https://spec.matrix.org/v1.18/client-server-api/#mroommessage).
     /// Additionally it's possible to add arbitrary key/value pairs to the event content for custom
     /// events through the `data` map.
     ///
@@ -485,7 +470,7 @@ impl MessageType {
             "m.key.verification.request" => {
                 Self::VerificationRequest(deserialize_variant(body, data)?)
             }
-            _ => Self::_Custom(CustomEventContent { msgtype: msgtype.to_owned(), body, data }),
+            _ => Self::_Custom(CustomMessageContent { msgtype: msgtype.to_owned(), body, data }),
         })
     }
 
@@ -621,8 +606,8 @@ impl MessageType {
     ///
     /// This method is only effective on text, notice and emote messages.
     ///
-    /// [tags and attributes]: https://spec.matrix.org/latest/client-server-api/#mroommessage-msgtypes
-    /// [rich reply]: https://spec.matrix.org/latest/client-server-api/#rich-replies
+    /// [tags and attributes]: https://spec.matrix.org/v1.18/client-server-api/#mroommessage-msgtypes
+    /// [rich reply]: https://spec.matrix.org/v1.18/client-server-api/#rich-replies
     #[cfg(feature = "html")]
     pub fn sanitize(
         &mut self,
@@ -759,7 +744,7 @@ impl<'a> From<&'a OriginalSyncRoomMessageEvent> for ReplyMetadata<'a> {
 
 /// The format for the formatted representation of a message body.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[non_exhaustive]
 pub enum MessageFormat {
     /// HTML.
@@ -805,8 +790,8 @@ impl FormattedBody {
     ///
     /// Returns the sanitized HTML if the format is `MessageFormat::Html`.
     ///
-    /// [tags and attributes]: https://spec.matrix.org/latest/client-server-api/#mroommessage-msgtypes
-    /// [rich reply]: https://spec.matrix.org/latest/client-server-api/#rich-replies
+    /// [tags and attributes]: https://spec.matrix.org/v1.18/client-server-api/#mroommessage-msgtypes
+    /// [rich reply]: https://spec.matrix.org/v1.18/client-server-api/#rich-replies
     #[cfg(feature = "html")]
     pub fn sanitize_html(
         &mut self,
@@ -821,8 +806,8 @@ impl FormattedBody {
 
 /// The payload for a custom message event.
 #[doc(hidden)]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CustomEventContent {
+#[derive(Clone, Debug, Serialize)]
+pub struct CustomMessageContent {
     /// A custom msgtype.
     msgtype: String,
 
@@ -863,15 +848,13 @@ pub(crate) fn parse_markdown(text: &str) -> Option<String> {
 
         for event in parser_events.iter().skip(1) {
             match event {
-                Event::Text(s) => {
-                    // If the string does not contain markdown, the only modification that should
-                    // happen is that newlines are converted to hardbreaks. It means that we should
-                    // find all the other characters from the original string in the text events.
-                    // Let's check that by walking the original string.
-                    if text[pos..].starts_with(s.as_ref()) {
-                        pos += s.len();
-                        continue;
-                    }
+                // If the string does not contain markdown, the only modification that should
+                // happen is that newlines are converted to hardbreaks. It means that we should
+                // find all the other characters from the original string in the text events.
+                // Let's check that by walking the original string.
+                Event::Text(s) if text[pos..].starts_with(s.as_ref()) => {
+                    pos += s.len();
+                    continue;
                 }
                 Event::HardBreak => {
                     // A hard break happens when a newline is encountered, which is not necessarily

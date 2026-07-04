@@ -2,7 +2,7 @@
 
 use ruma_macros::IdDst;
 
-use super::{matrix_uri::UriAction, server_name::ServerName, MatrixToUri, MatrixUri, OwnedEventId};
+use super::{MatrixToUri, MatrixUri, OwnedEventId, matrix_uri::UriAction, server_name::ServerName};
 
 /// A Matrix [room alias ID].
 ///
@@ -14,7 +14,7 @@ use super::{matrix_uri::UriAction, server_name::ServerName, MatrixToUri, MatrixU
 /// assert_eq!(<&RoomAliasId>::try_from("#ruma:example.com").unwrap(), "#ruma:example.com");
 /// ```
 ///
-/// [room alias ID]: https://spec.matrix.org/latest/appendices/#room-aliases
+/// [room alias ID]: https://spec.matrix.org/v1.18/appendices/#room-aliases
 #[repr(transparent)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, IdDst)]
 #[ruma_id(validate = ruma_identifiers_validation::room_alias_id::validate)]
@@ -28,7 +28,7 @@ impl RoomAliasId {
 
     /// Returns the server name of the room alias ID.
     pub fn server_name(&self) -> &ServerName {
-        ServerName::from_borrowed(&self.as_str()[self.colon_idx() + 1..])
+        ServerName::from_borrowed_unchecked(&self.as_str()[self.colon_idx() + 1..])
     }
 
     /// Create a `matrix.to` URI for this room alias ID.
@@ -48,7 +48,7 @@ impl RoomAliasId {
     ///
     /// If `join` is `true`, a click on the URI should join the room.
     pub fn matrix_uri(&self, join: bool) -> MatrixUri {
-        MatrixUri::new(self.into(), Vec::new(), Some(UriAction::Join).filter(|_| join))
+        MatrixUri::new(self.into(), Vec::new(), join.then_some(UriAction::Join))
     }
 
     /// Create a `matrix:` URI for an event scoped under this room alias ID.

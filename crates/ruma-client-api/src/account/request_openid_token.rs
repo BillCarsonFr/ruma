@@ -5,17 +5,18 @@
 pub mod v3 {
     //! `/v3/` ([spec])
     //!
-    //! [spec]: https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3useruseridopenidrequest_token
+    //! [spec]: https://spec.matrix.org/v1.18/client-server-api/#post_matrixclientv3useruseridopenidrequest_token
 
     use std::time::Duration;
 
     use ruma_common::{
-        api::{request, response, Metadata},
+        OwnedServerName, OwnedUserId,
+        api::{auth_scheme::AccessToken, request, response},
         authentication::TokenType,
-        metadata, OwnedServerName, OwnedUserId,
+        metadata,
     };
 
-    const METADATA: Metadata = metadata! {
+    metadata! {
         method: POST,
         rate_limited: true,
         authentication: AccessToken,
@@ -23,10 +24,10 @@ pub mod v3 {
             1.0 => "/_matrix/client/r0/user/{user_id}/openid/request_token",
             1.1 => "/_matrix/client/v3/user/{user_id}/openid/request_token",
         }
-    };
+    }
 
     /// Request type for the `request_openid_token` endpoint.
-    #[request(error = crate::Error)]
+    #[request]
     pub struct Request {
         /// User ID of authenticated user.
         #[ruma_api(path)]
@@ -34,7 +35,7 @@ pub mod v3 {
     }
 
     /// Response type for the `request_openid_token` endpoint.
-    #[response(error = crate::Error)]
+    #[response]
     pub struct Response {
         /// Access token for verifying user's identity.
         pub access_token: String,

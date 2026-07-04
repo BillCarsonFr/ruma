@@ -22,7 +22,7 @@ pub mod ready;
 pub mod request;
 pub mod start;
 
-// For these two constants, see <https://spec.matrix.org/latest/client-server-api/#key-verification-framework>
+// For these two constants, see <https://spec.matrix.org/v1.18/client-server-api/#key-verification-framework>
 /// The amount of time after which a verification request should be ignored, relative to its
 /// `origin_server_ts` (for in-room events) or its `timestamp` (for to-device events).
 ///
@@ -37,7 +37,7 @@ pub const REQUEST_RECEIVED_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
 /// A hash algorithm.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum HashAlgorithm {
@@ -50,7 +50,7 @@ pub enum HashAlgorithm {
 
 /// A key agreement protocol.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum KeyAgreementProtocol {
@@ -66,7 +66,7 @@ pub enum KeyAgreementProtocol {
 
 /// A message authentication code algorithm.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum MessageAuthenticationCode {
@@ -87,7 +87,7 @@ pub enum MessageAuthenticationCode {
 
 /// A Short Authentication String method.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[ruma_enum(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ShortAuthenticationString {
@@ -103,7 +103,7 @@ pub enum ShortAuthenticationString {
 
 /// A Short Authentication String (SAS) verification method.
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
-#[derive(Clone, PartialEq, Eq, StringEnum)]
+#[derive(Clone, StringEnum)]
 #[non_exhaustive]
 pub enum VerificationMethod {
     /// The `m.sas.v1` verification method.
