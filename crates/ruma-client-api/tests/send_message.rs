@@ -10,8 +10,8 @@ use ruma_common::{
     serde::Raw,
 };
 #[cfg(feature = "unstable-msc4354")]
-use ruma_events::StickyDurationMs;
 use ruma_events::MessageLikeEventType;
+use ruma_events::StickyDurationMs;
 use serde_json::json;
 
 #[cfg(feature = "unstable-msc4354")]
@@ -44,7 +44,7 @@ fn test_send_message_serialize() {
         api::{MatrixVersion, OutgoingRequest as _, SendAccessToken, SupportedVersions},
         owned_room_id,
     };
-    use ruma_events::{room::name::RoomNameEventContent, EmptyStateKey};
+    use ruma_events::{EmptyStateKey, room::name::RoomNameEventContent};
 
     let supported =
         SupportedVersions { versions: [MatrixVersion::V1_1].into(), features: Default::default() };
@@ -76,7 +76,7 @@ fn serialize_sticky_state_event() {
         api::{MatrixVersion, OutgoingRequest as _, SendAccessToken, SupportedVersions},
         owned_room_id,
     };
-    use ruma_events::{room::name::RoomNameEventContent, EmptyStateKey};
+    use ruma_events::{EmptyStateKey, room::name::RoomNameEventContent};
 
     let supported =
         SupportedVersions { versions: [MatrixVersion::V1_1].into(), features: Default::default() };
