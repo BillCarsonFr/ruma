@@ -1,11 +1,13 @@
 #![cfg(all(test, feature = "client"))]
 
+use std::borrow::Cow;
+
 use ruma_client_api::{
     message::send_message_event::v3::Request as SendMessageRequest,
     state::send_state_event::v3::Request as SendStateRequest,
 };
 use ruma_common::{
-    api::{MatrixVersion, OutgoingRequest, SendAccessToken, SupportedVersions},
+    api::{MatrixVersion, OutgoingRequest, SupportedVersions, auth_scheme::SendAccessToken},
     owned_room_id,
     serde::Raw,
 };
@@ -31,7 +33,7 @@ fn test_sticky_send_message_request() {
         .try_into_http_request(
             "https://homeserver.tld",
             SendAccessToken::IfRequired("auth_tok"),
-            &supported,
+            Cow::Owned(supported),
         )
         .unwrap();
 
@@ -41,7 +43,7 @@ fn test_sticky_send_message_request() {
 #[test]
 fn test_send_message_serialize() {
     use ruma_common::{
-        api::{MatrixVersion, OutgoingRequest as _, SendAccessToken, SupportedVersions},
+        api::{MatrixVersion, OutgoingRequest as _, SupportedVersions},
         owned_room_id,
     };
     use ruma_events::{EmptyStateKey, room::name::RoomNameEventContent};
@@ -59,7 +61,7 @@ fn test_send_message_serialize() {
     .try_into_http_request::<Vec<u8>>(
         "https://server.tld",
         SendAccessToken::IfRequired("access_token"),
-        &supported,
+        Cow::Owned(supported),
     )
     .unwrap();
 
@@ -73,7 +75,7 @@ fn test_send_message_serialize() {
 #[test]
 fn serialize_sticky_state_event() {
     use ruma_common::{
-        api::{MatrixVersion, OutgoingRequest as _, SendAccessToken, SupportedVersions},
+        api::{MatrixVersion, OutgoingRequest as _, SupportedVersions},
         owned_room_id,
     };
     use ruma_events::{EmptyStateKey, room::name::RoomNameEventContent};
@@ -95,7 +97,7 @@ fn serialize_sticky_state_event() {
         .try_into_http_request::<Vec<u8>>(
             "https://server.tld",
             SendAccessToken::IfRequired("access_token"),
-            &supported,
+            Cow::Owned(supported),
         )
         .unwrap();
 
