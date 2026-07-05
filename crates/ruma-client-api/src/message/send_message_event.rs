@@ -147,8 +147,7 @@ pub mod v3 {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "unstable-msc4354")]
+#[cfg(all(test, feature = "client", feature = "unstable-msc4354"))]
 mod tests {
     use std::borrow::Cow;
 
