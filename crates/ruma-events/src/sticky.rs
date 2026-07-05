@@ -12,6 +12,14 @@ use serde::{Deserialize, Serialize, Serializer, de::Error};
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct StickyDurationMs(u32);
 
+/// New event top-level sticky object.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct StickyObject {
+    /// The number of milliseconds for the event to be sticky.
+    pub duration_ms: StickyDurationMs,
+}
+
 impl StickyDurationMs {
     /// The maximum possible sticky duration in millis (1 hour).
     pub const MAX: u32 = 3_600_000;
@@ -88,7 +96,7 @@ impl Serialize for StickyDurationMs {
 
 #[cfg(test)]
 mod tests {
-    use crate::sticky::StickyDurationMs;
+    use crate::sticky::{StickyDurationMs, StickyObject};
 
     #[test]
     fn deserialize_sticky_ok() {
@@ -144,5 +152,19 @@ mod tests {
                 "invalid value: integer `-1`, expected an integer in the range 0-3600000"
             )
         );
+    }
+
+    #[test]
+    fn deserialize_sticky_object_ok() {
+        let ser = r#"{"duration_ms":78000}"#;
+        let sticky_object: StickyObject = serde_json::from_str(ser).unwrap();
+        assert_eq!(sticky_object.duration_ms.get(), 78_000_u32);
+    }
+
+    #[test]
+    fn deserialize_sticky_object_err() {
+        let raw = r#"{"duration_ms":3600001}"#;
+        let res: Result<StickyObject, _> = serde_json::from_str(raw);
+        assert!(res.is_err());
     }
 }

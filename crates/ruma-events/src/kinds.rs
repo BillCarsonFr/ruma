@@ -9,8 +9,6 @@ use ruma_macros::Event;
 use serde::{Deserialize, Deserializer, Serialize, ser::SerializeStruct};
 use serde_json::value::RawValue as RawJsonValue;
 
-#[cfg(feature = "unstable-msc4354")]
-use super::sticky::StickyDurationMs;
 use super::{
     AnyInitialStateEvent, EmptyStateKey, EphemeralRoomEventContent, EventContentFromType,
     GlobalAccountDataEventContent, MessageLikeEventContent, MessageLikeEventType,
@@ -19,6 +17,8 @@ use super::{
     RedactionDeHelper, RoomAccountDataEventContent, StateEventType, StaticStateEventContent,
     ToDeviceEventContent,
 };
+#[cfg(feature = "unstable-msc4354")]
+use crate::sticky::StickyObject;
 
 /// A global account data event.
 #[derive(Clone, Debug, Event)]
@@ -175,7 +175,7 @@ pub struct OriginalMessageLikeEvent<C: MessageLikeEventContent> {
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
     #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyDurationMs>,
+    pub msc4354_sticky: Option<StickyObject>,
 }
 
 impl<C: MessageLikeEventContent> JsonCastable<OriginalSyncMessageLikeEvent<C>>
@@ -226,7 +226,7 @@ pub struct OriginalSyncMessageLikeEvent<C: MessageLikeEventContent> {
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
     #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyDurationMs>,
+    pub msc4354_sticky: Option<StickyObject>,
 }
 
 impl<C: MessageLikeEventContent + RedactContent> OriginalSyncMessageLikeEvent<C>
@@ -420,7 +420,7 @@ pub struct OriginalStateEvent<C: StaticStateEventContent> {
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
     #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyDurationMs>,
+    pub msc4354_sticky: Option<StickyObject>,
 }
 
 impl<C: StaticStateEventContent> JsonCastable<OriginalSyncStateEvent<C>> for OriginalStateEvent<C> {}
@@ -483,7 +483,7 @@ pub struct OriginalSyncStateEvent<C: StaticStateEventContent> {
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
     #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyDurationMs>,
+    pub msc4354_sticky: Option<StickyObject>,
 }
 
 impl<C: StaticStateEventContent + RedactContent> JsonCastable<SyncStateEvent<C>>

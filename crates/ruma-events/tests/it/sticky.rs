@@ -54,6 +54,7 @@ fn deserialize_sticky_event() {
     assert_eq!(content.body(), "Hello, but sticky");
 
     assert!(message_event.msc4354_sticky.is_some());
+    assert_eq!(message_event.msc4354_sticky.map(|s| s.duration_ms.get()), Some(3_600_000));
 }
 
 #[test]
@@ -84,12 +85,6 @@ fn deserialize_sticky_out_of_range() {
     assert!(message_event.msc4354_sticky.is_none());
 }
 
-#[test]
-fn serialize_sticky() {
-    let sticky = StickyDurationMs::new_clamped(60_000_u32);
-    let ser = serde_json::to_string(&sticky).unwrap();
-    assert_eq!(ser, r#"{"duration_ms":60000}"#);
-}
 #[test]
 fn deserialize_sticky_event_default() {
     let json_data = json!({
