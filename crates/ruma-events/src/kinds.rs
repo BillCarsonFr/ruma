@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, ser::SerializeStruct};
 use serde_json::value::RawValue as RawJsonValue;
 
 #[cfg(feature = "unstable-msc4354")]
-use super::sticky::StickyObject;
+use super::sticky::StickyDurationMs;
 use super::{
     AnyInitialStateEvent, EmptyStateKey, EphemeralRoomEventContent, EventContentFromType,
     GlobalAccountDataEventContent, MessageLikeEventContent, MessageLikeEventType,
@@ -174,8 +174,8 @@ pub struct OriginalMessageLikeEvent<C: MessageLikeEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error)]
+    pub msc4354_sticky: Option<StickyDurationMs>,
 }
 
 impl<C: MessageLikeEventContent> JsonCastable<OriginalSyncMessageLikeEvent<C>>
@@ -225,8 +225,8 @@ pub struct OriginalSyncMessageLikeEvent<C: MessageLikeEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error)]
+    pub msc4354_sticky: Option<StickyDurationMs>,
 }
 
 impl<C: MessageLikeEventContent + RedactContent> OriginalSyncMessageLikeEvent<C>
@@ -419,8 +419,8 @@ pub struct OriginalStateEvent<C: StaticStateEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error)]
+    pub msc4354_sticky: Option<StickyDurationMs>,
 }
 
 impl<C: StaticStateEventContent> JsonCastable<OriginalSyncStateEvent<C>> for OriginalStateEvent<C> {}
@@ -482,8 +482,8 @@ pub struct OriginalSyncStateEvent<C: StaticStateEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error)]
+    pub msc4354_sticky: Option<StickyDurationMs>,
 }
 
 impl<C: StaticStateEventContent + RedactContent> JsonCastable<SyncStateEvent<C>>

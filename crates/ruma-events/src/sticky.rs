@@ -2,13 +2,14 @@
 //!
 //! [MSC4268]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
 
-use js_int::UInt;
-use serde::{Deserialize, Serialize, Serializer};
+use std::fmt::Formatter;
+
+use serde::{Deserialize, Serialize, Serializer, de::Error};
 
 /// Sticky duration in milliseconds.
-/// 
+///
 /// Valid values are the integer range 0-3600000 (1 hour).
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct StickyDurationMs(u32);
 
 impl StickyDurationMs {
@@ -34,68 +35,114 @@ impl From<StickyDurationMs> for u32 {
     }
 }
 
-/// Message events can be annotated with a new top-level sticky object,
-/// which MUST have a duration_ms, which is the number of milliseconds for the event to be
-/// sticky.
-#[derive(Clone, Debug)]
-#[non_exhaustive]
-pub enum StickyObject {
-    /// A valid sticky duration within the allowed range (0 to 1 hour).
-    Valid(StickyDurationMs),
-    /// An invalid sticky duration outside the allowed range.
-    OutOfRange(UInt),
-}
-
-#[derive(Deserialize, Serialize)]
-struct StickyDeHelper {
-    duration_ms: UInt,
-}
-
-impl<'de> Deserialize<'de> for StickyObject {
+impl<'de> Deserialize<'de> for StickyDurationMs {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let helper = StickyDeHelper::deserialize(deserializer)?;
-        let sticky_object = if helper.duration_ms <= StickyDurationMs::MAX.into() {
-            Self::Valid(StickyDurationMs::new_clamped(helper.duration_ms))
-        } else {
-            Self::OutOfRange(helper.duration_ms)
-        };
+        struct StickyDurationMsVisitor;
 
-        Ok(sticky_object)
+        impl<'de> serde::de::Visitor<'de> for StickyDurationMsVisitor {
+            type Value = StickyDurationMs;
+
+            fn expecting(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "an integer in the range 0-3600000")
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                if v < 0 {
+                    Err(E::invalid_value(serde::de::Unexpected::Signed(v), &self))
+                } else {
+                    self.visit_u64(v as u64)
+                }
+            }
+
+            // serde json deserialize json numbers as u64 by default
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                if v > StickyDurationMs::MAX as u64 {
+                    Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self))
+                } else {
+                    Ok(StickyDurationMs(v as u32))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(StickyDurationMsVisitor)
     }
 }
 
-impl Serialize for StickyObject {
+impl Serialize for StickyDurationMs {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        match self {
-            Self::Valid(duration) => {
-                StickyDeHelper { duration_ms: duration.get().into() }.serialize(serializer)
-            }
-            Self::OutOfRange(out_of_range) => {
-                StickyDeHelper { duration_ms: *out_of_range }.serialize(serializer)
-            }
-        }
-    }
-}
-
-impl StickyObject {
-    /// Returns the sticky duration if the sticky event is valid.
-    /// Returns `None` if the sticky property is invalid (out of range).
-    pub fn sticky_duration(&self) -> Option<StickyDurationMs> {
-        match self {
-            StickyObject::Valid(duration) => Some(*duration),
-            StickyObject::OutOfRange(_) => None,
-        }
+        serializer.serialize_u32(self.0)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::StickyObject;
+    use crate::sticky::StickyDurationMs;
 
+    #[test]
+    fn deserialize_sticky_ok() {
+        let raw = "78000";
+        let sticky_duration: StickyDurationMs = serde_json::from_str(raw).unwrap();
+        assert_eq!(sticky_duration.get(), 78_000_u32);
+    }
+
+    #[test]
+    fn serialize_sticky() {
+        let sticky = StickyDurationMs::new_clamped(60_000_u32);
+        let ser = serde_json::to_string(&sticky).unwrap();
+        assert_eq!(ser, "60000");
+    }
+
+    #[test]
+    fn deserialize_sticky_oob() {
+        let raw = "3600001";
+        let res: Result<StickyDurationMs, _> = serde_json::from_str(raw);
+        assert!(res.is_err());
+
+        let err = res.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(err_msg.contains(
+            "invalid value: integer `3600001`, expected an integer in the range 0-3600000"
+        ));
+    }
+
+    #[test]
+    fn deserialize_sticky_float_err() {
+        let raw = "3000.0";
+        let res: Result<StickyDurationMs, _> = serde_json::from_str(raw);
+        assert!(res.is_err());
+
+        let err = res.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(err_msg.contains(
+            "invalid type: floating point `3000.0`, expected an integer in the range 0-3600000"
+        ));
+    }
+
+    #[test]
+    fn deserialize_sticky_neg_err() {
+        let raw = "-1";
+        let res: Result<StickyDurationMs, _> = serde_json::from_str(raw);
+        assert!(res.is_err());
+
+        let err = res.unwrap_err();
+        let err_msg = err.to_string();
+        println!("{}", err_msg);
+        assert!(
+            err_msg.contains(
+                "invalid value: integer `-1`, expected an integer in the range 0-3600000"
+            )
+        );
+    }
 }

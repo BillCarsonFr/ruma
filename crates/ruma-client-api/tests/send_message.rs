@@ -14,7 +14,7 @@ use ruma_events::{EmptyStateKey, room::name::RoomNameEventContent};
 fn test_sticky_send_message_request() {
     use ruma_client_api::message::send_message_event::v3::Request as SendMessageRequest;
     use ruma_common::serde::Raw;
-    use ruma_events::{MessageLikeEventType, StickyDurationMs};
+    use ruma_events::{MessageLikeEventType, sticky::StickyDurationMs};
     use serde_json::json;
 
     let supported =
@@ -70,7 +70,7 @@ fn serialize_sticky_state_event() {
         api::{MatrixVersion, OutgoingRequest as _, SupportedVersions},
         owned_room_id,
     };
-    use ruma_events::{EmptyStateKey, StickyDurationMs, room::name::RoomNameEventContent};
+    use ruma_events::{EmptyStateKey, sticky::StickyDurationMs, room::name::RoomNameEventContent};
 
     let supported =
         SupportedVersions { versions: [MatrixVersion::V1_1].into(), features: Default::default() };

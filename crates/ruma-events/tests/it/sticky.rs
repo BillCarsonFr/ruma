@@ -1,7 +1,7 @@
 use assert_matches2::assert_matches;
 use js_int::uint;
 use ruma_common::{MilliSecondsSinceUnixEpoch, serde::CanBeEmpty};
-use ruma_events::{AnyMessageLikeEvent, MessageLikeEvent, StickyDurationMs, StickyObject};
+use ruma_events::{AnyMessageLikeEvent, MessageLikeEvent, sticky::StickyDurationMs};
 use serde_json::{from_value as from_json_value, json};
 
 #[test]
@@ -81,30 +81,14 @@ fn deserialize_sticky_out_of_range() {
     let content = message_event.content;
     assert_eq!(content.body(), "Hello, but sticky");
 
-    assert!(message_event.msc4354_sticky.is_some());
-
-    assert_matches!(
-        message_event.msc4354_sticky.as_ref().unwrap(),
-        StickyObject::OutOfRange(out_of_range)
-    );
-
-    assert_eq!(out_of_range.clone(), 4_600_000_u32.into());
-
-    assert!(message_event.msc4354_sticky.unwrap().sticky_duration().is_none());
+    assert!(message_event.msc4354_sticky.is_none());
 }
 
 #[test]
 fn serialize_sticky() {
-    let sticky = StickyObject::Valid(StickyDurationMs::new_clamped(60_000_u32));
+    let sticky = StickyDurationMs::new_clamped(60_000_u32);
     let ser = serde_json::to_string(&sticky).unwrap();
     assert_eq!(ser, r#"{"duration_ms":60000}"#);
-
-    let sticky = StickyObject::OutOfRange(5_000_000_u32.into());
-    let ser = serde_json::to_string(&sticky).unwrap();
-    assert_eq!(ser, r#"{"duration_ms":5000000}"#);
-
-    let sticky: StickyObject = serde_json::from_str(ser.as_str()).unwrap();
-    assert_matches!(sticky, StickyObject::OutOfRange(_));
 }
 #[test]
 fn deserialize_sticky_event_default() {
