@@ -1,6 +1,6 @@
 //! Types for the sticky events event defined in [MSC4354].
 //!
-//! [MSC4268]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+//! [MSC4354]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
 
 use std::fmt::Formatter;
 
