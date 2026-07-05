@@ -53,8 +53,34 @@ fn deserialize_sticky_event() {
     let content = message_event.content;
     assert_eq!(content.body(), "Hello, but sticky");
 
-    assert!(message_event.msc4354_sticky.is_some());
-    assert_eq!(message_event.msc4354_sticky.map(|s| s.duration_ms.get()), Some(3_600_000));
+    assert!(message_event.sticky.is_some());
+    assert_eq!(message_event.sticky.map(|s| s.duration_ms.get()), Some(3_600_000));
+}
+
+#[test]
+fn deserialize_sticky_event_stable_id() {
+    let json_data = json!({
+        "content": {
+            "body": "Hello, but sticky",
+            "msgtype": "m.text",
+        },
+        "event_id": "$h29iv0s8:example.com",
+        "origin_server_ts": 1,
+        "room_id": "!roomid:room.com",
+        "sender": "@alice:example.com",
+        "type": "m.room.message",
+        "sticky": {
+            "duration_ms": 30_000
+        }
+    });
+
+    assert_matches!(
+        from_json_value::<AnyMessageLikeEvent>(json_data).unwrap(),
+        AnyMessageLikeEvent::RoomMessage(MessageLikeEvent::Original(message_event))
+    );
+
+    assert!(message_event.sticky.is_some());
+    assert_eq!(message_event.sticky.map(|s| s.duration_ms.get()), Some(30_000));
 }
 
 #[test]
@@ -82,7 +108,7 @@ fn deserialize_sticky_out_of_range() {
     let content = message_event.content;
     assert_eq!(content.body(), "Hello, but sticky");
 
-    assert!(message_event.msc4354_sticky.is_none());
+    assert!(message_event.sticky.is_none());
 }
 
 #[test]
@@ -104,5 +130,5 @@ fn deserialize_sticky_event_default() {
         AnyMessageLikeEvent::RoomMessage(MessageLikeEvent::Original(message_event))
     );
 
-    assert!(message_event.msc4354_sticky.is_none());
+    assert!(message_event.sticky.is_none());
 }

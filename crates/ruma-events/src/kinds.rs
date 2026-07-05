@@ -174,8 +174,8 @@ pub struct OriginalMessageLikeEvent<C: MessageLikeEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error, rename = "msc4354_sticky", alias = "sticky")]
+    pub sticky: Option<StickyObject>,
 }
 
 impl<C: MessageLikeEventContent> JsonCastable<OriginalSyncMessageLikeEvent<C>>
@@ -225,8 +225,8 @@ pub struct OriginalSyncMessageLikeEvent<C: MessageLikeEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error, rename = "msc4354_sticky", alias = "sticky")]
+    pub sticky: Option<StickyObject>,
 }
 
 impl<C: MessageLikeEventContent + RedactContent> OriginalSyncMessageLikeEvent<C>
@@ -419,8 +419,8 @@ pub struct OriginalStateEvent<C: StaticStateEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error, rename = "msc4354_sticky", alias = "sticky")]
+    pub sticky: Option<StickyObject>,
 }
 
 impl<C: StaticStateEventContent> JsonCastable<OriginalSyncStateEvent<C>> for OriginalStateEvent<C> {}
@@ -482,8 +482,8 @@ pub struct OriginalSyncStateEvent<C: StaticStateEventContent> {
     /// which MUST have a duration_ms, which is the number of milliseconds for the event to be
     /// sticky.
     #[cfg(feature = "unstable-msc4354")]
-    #[ruma_event(default, default_on_error)]
-    pub msc4354_sticky: Option<StickyObject>,
+    #[ruma_event(default, default_on_error, rename = "msc4354_sticky", alias = "sticky")]
+    pub sticky: Option<StickyObject>,
 }
 
 impl<C: StaticStateEventContent + RedactContent> JsonCastable<SyncStateEvent<C>>
