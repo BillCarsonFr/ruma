@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn test_send_message_serialize() {
+    fn test_send_state_serialize() {
         let supported = SupportedVersions {
             versions: [MatrixVersion::V1_1].into(),
             features: Default::default(),
@@ -218,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_sticky_state_event() {
+    fn test_send_sticky_state_serialize() {
         let supported = SupportedVersions {
             versions: [MatrixVersion::V1_1].into(),
             features: Default::default(),
