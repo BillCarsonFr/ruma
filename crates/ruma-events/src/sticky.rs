@@ -24,7 +24,7 @@ impl StickyDurationMs {
     /// The maximum possible sticky duration in millis (1 hour).
     pub const MAX: u32 = 3_600_000;
 
-    /// Creates a `DurationMs` by clamping `v` into `[0, 1h]`.
+    /// Creates a `StickyDurationMs` by clamping `v` into `[0, 1h]`.
     pub fn new_clamped<T: Into<u64>>(v: T) -> Self {
         let v = v.into();
         let clamped = v.min(Self::MAX as u64) as u32;
