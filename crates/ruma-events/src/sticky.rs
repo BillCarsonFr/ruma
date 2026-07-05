@@ -6,6 +6,7 @@ use js_int::UInt;
 use serde::{Deserialize, Serialize, Serializer};
 
 /// Sticky duration in milliseconds.
+/// 
 /// Valid values are the integer range 0-3600000 (1 hour).
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub struct StickyDurationMs(u32);
