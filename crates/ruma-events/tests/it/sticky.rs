@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use assert_matches2::assert_matches;
 use js_int::uint;
 use ruma_common::{MilliSecondsSinceUnixEpoch, serde::CanBeEmpty};
@@ -131,4 +133,62 @@ fn deserialize_sticky_event_default() {
     );
 
     assert!(message_event.sticky.is_none());
+}
+
+#[test]
+fn deserialize_sticky_duration_ttl_ms() {
+    let json_data = json!({
+        "content": {
+            "body": "Hello, but sticky",
+            "msgtype": "m.text",
+        },
+        "event_id": "$h29iv0s8:example.com",
+        "origin_server_ts": 1,
+        "room_id": "!roomid:room.com",
+        "sender": "@alice:example.com",
+        "type": "m.room.message",
+        "msc4354_sticky": {
+            "duration_ms": 3_600_000
+        },
+        "unsigned": {
+            "msc4354_sticky_duration_ttl_ms": 42_000
+        }
+    });
+
+    assert_matches!(
+        from_json_value::<AnyMessageLikeEvent>(json_data).unwrap(),
+        AnyMessageLikeEvent::RoomMessage(MessageLikeEvent::Original(message_event))
+    );
+
+    assert_eq!(message_event.unsigned.sticky_duration_ttl_ms, Some(Duration::from_millis(42_000)));
+    assert!(!message_event.unsigned.is_empty());
+}
+
+#[test]
+fn deserialize_sticky_duration_ttl_ms_stable_id() {
+    let json_data = json!({
+        "content": {
+            "body": "Hello, but sticky",
+            "msgtype": "m.text",
+        },
+        "event_id": "$h29iv0s8:example.com",
+        "origin_server_ts": 1,
+        "room_id": "!roomid:room.com",
+        "sender": "@alice:example.com",
+        "type": "m.room.message",
+        "sticky": {
+            "duration_ms": 3_600_000
+        },
+        "unsigned": {
+            "sticky_duration_ttl_ms": 42_000
+        }
+    });
+
+    assert_matches!(
+        from_json_value::<AnyMessageLikeEvent>(json_data).unwrap(),
+        AnyMessageLikeEvent::RoomMessage(MessageLikeEvent::Original(message_event))
+    );
+
+    assert_eq!(message_event.unsigned.sticky_duration_ttl_ms, Some(Duration::from_millis(42_000)));
+    assert!(!message_event.unsigned.is_empty());
 }
