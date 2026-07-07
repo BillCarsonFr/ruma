@@ -170,6 +170,9 @@ event_enum! {
         #[cfg(feature = "unstable-msc4310")]
         #[ruma_enum(alias = "m.rtc.decline")]
         "org.matrix.msc4310.rtc.decline" => super::rtc::decline,
+        #[cfg(feature = "unstable-msc4143")]
+        #[ruma_enum(alias = "m.rtc.member")]
+        "org.matrix.msc4143.rtc.member" => super::rtc::member,
     }
 
     /// Any state event.
@@ -210,6 +213,9 @@ event_enum! {
         #[cfg(feature = "unstable-msc4171")]
         #[ruma_enum(alias = "m.member_hints")]
         "io.element.functional_members" => super::member_hints,
+        #[cfg(feature = "unstable-msc4143")]
+        #[ruma_enum(alias = "m.rtc.slot")]
+        "org.matrix.msc4143.rtc.slot" => super::rtc::slot,
     }
 
     /// Any to-device event.
@@ -245,6 +251,9 @@ event_enum! {
         #[cfg(feature = "unstable-msc4471")]
         #[ruma_enum(alias = "m.stream.update")]
         "org.matrix.msc4471.stream.update" => super::stream::update,
+        #[cfg(feature = "unstable-msc4143")]
+        #[ruma_enum(alias = "m.rtc.encryption_key")]
+        "org.matrix.msc4143.rtc.encryption_key" => super::rtc::encryption_key,
     }
 }
 
@@ -517,6 +526,8 @@ impl AnyMessageLikeEventContent {
             Self::RtcNotification(ev) => ev.relates_to.clone().map(encrypted::Relation::Reference),
             #[cfg(feature = "unstable-msc4310")]
             Self::RtcDecline(ev) => Some(encrypted::Relation::Reference(ev.relates_to.clone())),
+            #[cfg(feature = "unstable-msc4143")]
+            Self::RtcMember(_) => None,
             Self::CallSdpStreamMetadataChanged(_)
             | Self::CallNegotiate(_)
             | Self::CallReject(_)

@@ -4,6 +4,15 @@
 
 Improvements:
 
+- Add MatrixRTC event types from [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143),
+  behind the `unstable-msc4143` cargo feature (which enables `unstable-msc4354`):
+  - `RtcSlotEventContent` (`m.rtc.slot`, state event) in `ruma_events::rtc::slot`.
+  - `RtcMemberEventContent` (`m.rtc.member`, message-like sticky event) in
+    `ruma_events::rtc::member`.
+  - `ToDeviceRtcEncryptionKeyEventContent` (`m.rtc.encryption_key`, to-device event) in
+    `ruma_events::rtc::encryption_key`.
+  - The supporting `RtcApplication` and `RtcTransport` types in `ruma_events::rtc::application` and
+    `ruma_events::rtc::transport`.
 - Add `replaces_state` field to `StateUnsigned`, due to a clarification in the Matrix spec.
 - Stabilize image packs:
   - `RoomImagePackEventContent` uses its stable `m.room.image_pack` type and was moved under
