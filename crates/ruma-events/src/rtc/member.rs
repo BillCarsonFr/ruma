@@ -192,6 +192,7 @@ mod tests {
         rtc::{application::CallApplication, transport::RtcTransport},
     };
 
+    #[cfg(feature = "unstable-msc4195")]
     #[test]
     fn connecting_member_event_serialization() {
         let content = RtcMemberEventContent::new(
@@ -224,6 +225,50 @@ mod tests {
                     {
                         "type": "livekit",
                         "livekit_service_url": "https://livekit.example.com/jwt",
+                    }
+                ],
+                "versions": ["v0"],
+            })
+        );
+    }
+
+    #[test]
+    fn connecting_member_event_custom_transport_serialization() {
+        let transport = RtcTransport::new(
+            "org.example.transport",
+            json!({ "url": "https://sfu.example.com" }).as_object().unwrap().clone(),
+        )
+        .unwrap();
+        let content = RtcMemberEventContent::new(
+            "m.call#ROOM".to_owned(),
+            CallApplication::new("UUID".to_owned()).into(),
+            RtcMember::new(
+                "xyzABCDEF0123".to_owned(),
+                owned_device_id!("DEVICEID"),
+                owned_user_id!("@user:matrix.domain"),
+            ),
+            vec![transport],
+            vec!["v0".to_owned()],
+        );
+
+        assert_eq!(
+            to_json_value(&content).unwrap(),
+            json!({
+                "slot_id": "m.call#ROOM",
+                "sticky_key": "xyzABCDEF0123",
+                "application": {
+                    "type": "m.call",
+                    "m.call.id": "UUID",
+                },
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "claimed_device_id": "DEVICEID",
+                    "claimed_user_id": "@user:matrix.domain",
+                },
+                "rtc_transports": [
+                    {
+                        "type": "org.example.transport",
+                        "url": "https://sfu.example.com",
                     }
                 ],
                 "versions": ["v0"],

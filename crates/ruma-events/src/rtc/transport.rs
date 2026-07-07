@@ -15,6 +15,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[serde(tag = "type")]
 pub enum RtcTransport {
     /// A LiveKit RTC transport.
+    #[cfg(feature = "unstable-msc4195")]
     #[serde(rename = "livekit")]
     LiveKit(LiveKitRtcTransport),
 
@@ -39,6 +40,7 @@ impl<'de> Deserialize<'de> for RtcTransport {
         };
 
         Ok(match transport_type.as_str() {
+            #[cfg(feature = "unstable-msc4195")]
             "livekit" => Self::LiveKit(
                 serde_json::from_value(serde_json::Value::Object(obj)).map_err(D::Error::custom)?,
             ),
@@ -60,6 +62,7 @@ impl RtcTransport {
     /// corresponding `RtcTransport` variant fails.
     pub fn new(transport_type: &str, data: JsonObject) -> serde_json::Result<Self> {
         Ok(match transport_type {
+            #[cfg(feature = "unstable-msc4195")]
             "livekit" => Self::LiveKit(serde_json::from_value(serde_json::Value::Object(data))?),
             _ => Self::_Custom(CustomRtcTransport {
                 transport_type: transport_type.to_owned(),
@@ -69,6 +72,7 @@ impl RtcTransport {
     }
 
     /// Creates a new `RtcTransport::LiveKit`.
+    #[cfg(feature = "unstable-msc4195")]
     pub fn livekit(service_url: String) -> Self {
         Self::LiveKit(LiveKitRtcTransport { service_url })
     }
@@ -76,6 +80,7 @@ impl RtcTransport {
     /// Returns a reference to the transport type of this RTC transport.
     pub fn transport_type(&self) -> &str {
         match self {
+            #[cfg(feature = "unstable-msc4195")]
             Self::LiveKit(_) => "livekit",
             Self::_Custom(custom) => &custom.transport_type,
         }
@@ -89,6 +94,7 @@ impl RtcTransport {
     /// Prefer to use the public variants of `RtcTransport` where possible; this method is meant
     /// to be used for custom transport types only.
     pub fn data(&self) -> Cow<'_, JsonObject> {
+        #[cfg(feature = "unstable-msc4195")]
         fn serialize<T: Serialize>(object: &T) -> JsonObject {
             use serde_json::Value as JsonValue;
 
@@ -100,6 +106,7 @@ impl RtcTransport {
         }
 
         match self {
+            #[cfg(feature = "unstable-msc4195")]
             Self::LiveKit(info) => Cow::Owned(serialize(info)),
             Self::_Custom(info) => Cow::Borrowed(&info.data),
         }
@@ -107,6 +114,7 @@ impl RtcTransport {
 }
 
 /// Information about a LiveKit RTC transport.
+#[cfg(feature = "unstable-msc4195")]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct LiveKitRtcTransport {
@@ -115,6 +123,7 @@ pub struct LiveKitRtcTransport {
     pub service_url: String,
 }
 
+#[cfg(feature = "unstable-msc4195")]
 impl LiveKitRtcTransport {
     /// Creates a new `LiveKitRtcTransport` with the given service URL.
     pub fn new(service_url: String) -> Self {
@@ -122,6 +131,7 @@ impl LiveKitRtcTransport {
     }
 }
 
+#[cfg(feature = "unstable-msc4195")]
 impl From<LiveKitRtcTransport> for RtcTransport {
     fn from(value: LiveKitRtcTransport) -> Self {
         Self::LiveKit(value)
@@ -152,7 +162,7 @@ mod tests {
         Value as JsonValue, from_value as from_json_value, json, to_value as to_json_value,
     };
 
-    use super::{LiveKitRtcTransport, RtcTransport};
+    use super::RtcTransport;
 
     #[test]
     fn serialize_roundtrip_custom_rtc_transport() {
@@ -177,8 +187,11 @@ mod tests {
         assert_eq!(from_json_value::<RtcTransport>(json).unwrap(), transport);
     }
 
+    #[cfg(feature = "unstable-msc4195")]
     #[test]
     fn livekit_transport_new_and_from_impl() {
+        use super::LiveKitRtcTransport;
+
         let url = "http://livekit.local/".to_owned();
         let inner = LiveKitRtcTransport::new(url.clone());
         let transport = RtcTransport::from(inner);
@@ -186,6 +199,7 @@ mod tests {
         assert_eq!(transport, RtcTransport::livekit(url));
     }
 
+    #[cfg(feature = "unstable-msc4195")]
     #[test]
     fn serialize_roundtrip_livekit_transport() {
         let transport_type = "livekit";

@@ -4,6 +4,10 @@
 
 Improvements:
 
+- `rtc::RtcTransport` (and `LiveKitRtcTransport`) is now a re-export of the type defined in
+  `ruma_events::rtc::transport`, so the MatrixRTC transport is defined once and shared between the
+  `/rtc/transports` endpoint and the `m.rtc.member` event. The typed LiveKit variant remains gated
+  behind `unstable-msc4195`.
 - `profile::get_profile` is now using `ruma_common::profile::UserProfile` for its underlying data
   storage.
 - Add support for MSC4262 (Profile Updates Sliding Sync Extension).
