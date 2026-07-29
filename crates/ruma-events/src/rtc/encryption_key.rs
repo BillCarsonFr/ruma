@@ -30,19 +30,21 @@ pub struct ToDeviceRtcEncryptionKeyEventContent {
     /// The media encryption key material.
     pub media_key: MediaKey,
 
-    /// The version of the key format.
-    pub version: String,
+    /// The format in which the key was exported.
+    ///
+    /// The only currently allowed value is [`Self::FORMAT_UNPADDED_BASE64`].
+    pub format: u8,
 }
 
 impl ToDeviceRtcEncryptionKeyEventContent {
+    /// The key's raw bytes were encoded using unpadded base64.
+    ///
+    /// This is the only format that is currently allowed.
+    pub const FORMAT_UNPADDED_BASE64: u8 = 0;
+
     /// Creates a new `ToDeviceRtcEncryptionKeyEventContent`.
-    pub fn new(
-        room_id: OwnedRoomId,
-        member_id: String,
-        media_key: MediaKey,
-        version: String,
-    ) -> Self {
-        Self { room_id, member_id, media_key, version }
+    pub fn new(room_id: OwnedRoomId, member_id: String, media_key: MediaKey, format: u8) -> Self {
+        Self { room_id, member_id, media_key, format }
     }
 }
 
@@ -81,7 +83,7 @@ mod tests {
             owned_room_id!("!roomid:matrix.domain"),
             "xyzABCDEF0123".to_owned(),
             MediaKey::new(10, "base64encodedkey".to_owned()),
-            "0".to_owned(),
+            ToDeviceRtcEncryptionKeyEventContent::FORMAT_UNPADDED_BASE64,
         );
 
         assert_eq!(
@@ -93,7 +95,7 @@ mod tests {
                     "index": 10,
                     "key": "base64encodedkey",
                 },
-                "version": "0",
+                "format": 0,
             })
         );
     }
@@ -108,7 +110,7 @@ mod tests {
                     "index": 10,
                     "key": "base64encodedkey",
                 },
-                "version": "0",
+                "format": 0,
             },
             "sender": "@user:matrix.domain",
             "type": "m.rtc.encryption_key"
@@ -118,5 +120,6 @@ mod tests {
         assert_matches!(event, AnyToDeviceEvent::RtcEncryptionKey(ToDeviceEvent { content, .. }));
         assert_eq!(content.member_id, "xyzABCDEF0123");
         assert_eq!(content.media_key.index, 10);
+        assert_eq!(content.format, 0);
     }
 }

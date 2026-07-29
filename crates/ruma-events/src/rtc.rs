@@ -5,6 +5,8 @@ pub mod application;
 #[cfg(feature = "unstable-msc4310")]
 pub mod decline;
 #[cfg(feature = "unstable-msc4143")]
+pub mod encryption;
+#[cfg(feature = "unstable-msc4143")]
 pub mod encryption_key;
 #[cfg(feature = "unstable-msc4143")]
 pub mod member;

@@ -7,6 +7,40 @@ use std::borrow::Cow;
 use ruma_common::serde::JsonObject;
 use serde::{Deserialize, Deserializer, Serialize};
 
+/// The MatrixRTC transports of an [`m.rtc.member`] event.
+///
+/// Other clients use this information to determine how to connect to and exchange real-time data
+/// with the member.
+///
+/// [`m.rtc.member`]: super::member
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct RtcTransports {
+    /// The transports on which the member is publishing media.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub published: Vec<RtcTransport>,
+
+    /// The types of the transports that the member is able to subscribe to.
+    ///
+    /// Other members can use this as a cue for deciding which transports to use to accommodate
+    /// this member.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub can_subscribe: Vec<String>,
+}
+
+impl RtcTransports {
+    /// Creates an empty `RtcTransports`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Whether this doesn't contain any published transport nor any transport that can be
+    /// subscribed to.
+    pub fn is_empty(&self) -> bool {
+        self.published.is_empty() && self.can_subscribe.is_empty()
+    }
+}
+
 /// Information about a specific MatrixRTC transport.
 ///
 /// This describes how to reach a participant's media, e.g. the LiveKit SFU to connect to.

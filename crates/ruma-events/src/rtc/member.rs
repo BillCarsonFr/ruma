@@ -3,21 +3,21 @@
 //! Stable: `m.rtc.member`
 //! Unstable: `org.matrix.msc4143.rtc.member`
 //!
-//! An `m.rtc.member` event represents a participant's presence in a MatrixRTC slot. It is a
+//! An `m.rtc.member` event represents a participant's membership in a MatrixRTC slot. It is a
 //! [sticky event] ([MSC4354]): the `sticky_key` (a copy of `member.id`) is used to track the
-//! membership across updates. A member connects by sending an event with the full membership data,
-//! and disconnects by sending an event carrying only the `slot_id`, `sticky_key` and a
-//! `disconnect_reason`.
+//! membership across updates. A member joins by sending an event with `member.membership` set to
+//! [`RtcMembership::Join`] and the full membership data, and leaves by sending an event with
+//! `member.membership` set to [`RtcMembership::Leave`] and, optionally, a
+//! [`leave_reason`][RtcMemberEventContent::leave_reason].
 //!
 //! [sticky event]: crate::sticky
 //! [MSC4143]: https://github.com/matrix-org/matrix-spec-proposals/pull/4143
 //! [MSC4354]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
 
-use ruma_common::{OwnedDeviceId, OwnedUserId};
 use ruma_macros::{EventContent, StringEnum};
 use serde::{Deserialize, Serialize};
 
-use super::{application::RtcApplication, transport::RtcTransport};
+use super::{application::RtcApplication, transport::RtcTransports};
 use crate::PrivOwnedStr;
 
 /// The content of an `m.rtc.member` event.
@@ -29,152 +29,148 @@ use crate::PrivOwnedStr;
     kind = MessageLike
 )]
 pub struct RtcMemberEventContent {
-    /// The slot this member belongs to.
+    /// The `state_key` of the slot that is being joined.
     pub slot_id: String,
 
-    /// Unique key used to track this membership across updates.
-    ///
-    /// This is a copy of `member.id`.
-    pub sticky_key: String,
+    /// The information identifying the member.
+    pub member: RtcMember,
 
-    /// The application type this membership is for.
+    /// The application that is running in the slot.
     ///
-    /// Absent in a disconnecting event.
+    /// Required if the membership is [`RtcMembership::Join`]. The application's type is the same
+    /// as in the [`m.rtc.slot`] event.
+    ///
+    /// [`m.rtc.slot`]: super::slot
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub application: Option<RtcApplication>,
 
-    /// Identifies this participation instance.
+    /// The transports describing how to exchange real-time data with this member.
+    #[serde(default, skip_serializing_if = "RtcTransports::is_empty")]
+    pub transports: RtcTransports,
+
+    /// The reason why the member left the slot.
     ///
-    /// Absent in a disconnecting event.
+    /// Only used if the membership is [`RtcMembership::Leave`], and should only be set if the user
+    /// actually attempted to join the slot before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub member: Option<RtcMember>,
+    pub leave_reason: Option<LeaveReason>,
 
-    /// The transports describing how to access this participant's media.
+    /// The sticky key for the ephemeral map algorithm as defined in the addendum of [MSC4354].
     ///
-    /// Empty in a disconnecting event.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub rtc_transports: Vec<RtcTransport>,
-
-    /// Protocol versions and capabilities supported by the sending client.
+    /// This has the same value as `member.id`.
     ///
-    /// Empty in a disconnecting event.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub versions: Vec<String>,
-
-    /// The reason this member disconnected.
-    ///
-    /// Only present in a disconnecting event.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disconnect_reason: Option<DisconnectReason>,
+    /// [MSC4354]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+    pub sticky_key: String,
 }
 
 impl RtcMemberEventContent {
-    /// Creates a new connecting `RtcMemberEventContent`.
-    pub fn new(
+    /// Creates a new `RtcMemberEventContent` for joining a slot.
+    ///
+    /// The `member_id` must be unique for each join of the same user, which means that a different
+    /// identifier needs to be used when leaving and then rejoining a slot.
+    pub fn join(
         slot_id: String,
+        member_id: String,
         application: RtcApplication,
-        member: RtcMember,
-        rtc_transports: Vec<RtcTransport>,
-        versions: Vec<String>,
+        transports: RtcTransports,
     ) -> Self {
         Self {
             slot_id,
-            sticky_key: member.id.clone(),
+            member: RtcMember::new(member_id.clone(), RtcMembership::Join),
             application: Some(application),
-            member: Some(member),
-            rtc_transports,
-            versions,
-            disconnect_reason: None,
+            transports,
+            leave_reason: None,
+            sticky_key: member_id,
         }
     }
 
-    /// Creates a new disconnecting `RtcMemberEventContent`.
-    pub fn disconnected(
-        slot_id: String,
-        sticky_key: String,
-        disconnect_reason: DisconnectReason,
-    ) -> Self {
+    /// Creates a new `RtcMemberEventContent` for leaving a slot.
+    ///
+    /// The `member_id` must be the one of the `m.rtc.member` event that was previously used to join
+    /// the slot.
+    pub fn leave(slot_id: String, member_id: String) -> Self {
         Self {
             slot_id,
-            sticky_key,
+            member: RtcMember::new(member_id.clone(), RtcMembership::Leave),
             application: None,
-            member: None,
-            rtc_transports: Vec::new(),
-            versions: Vec::new(),
-            disconnect_reason: Some(disconnect_reason),
+            transports: RtcTransports::new(),
+            leave_reason: None,
+            sticky_key: member_id,
         }
     }
 }
 
-/// Identifies a MatrixRTC participation instance.
+/// The information identifying a member of a MatrixRTC slot.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 pub struct RtcMember {
-    /// Identifier used to distinguish multiple participations.
+    /// The identifier to distinguish multiple members, even for the same user and device.
     ///
-    /// This MUST be unique.
+    /// This MUST be unique for each join of the same user.
     pub id: String,
 
-    /// The Matrix device ID of the participating device.
-    ///
-    /// Claimed because it is not verified without encryption.
-    pub claimed_device_id: OwnedDeviceId,
-
-    /// The Matrix user ID of the participant.
-    ///
-    /// Claimed because it is not verified without encryption.
-    pub claimed_user_id: OwnedUserId,
+    /// The intended membership status.
+    pub membership: RtcMembership,
 }
 
 impl RtcMember {
     /// Creates a new `RtcMember`.
-    pub fn new(id: String, claimed_device_id: OwnedDeviceId, claimed_user_id: OwnedUserId) -> Self {
-        Self { id, claimed_device_id, claimed_user_id }
+    pub fn new(id: String, membership: RtcMembership) -> Self {
+        Self { id, membership }
     }
 }
 
-/// The reason a member disconnected from a MatrixRTC session.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
-pub struct DisconnectReason {
-    /// High-level category of the disconnection or error.
-    pub class: DisconnectClass,
-
-    /// Machine-readable identifier of the specific cause.
-    pub reason: String,
-
-    /// Optional human-readable explanation.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-}
-
-impl DisconnectReason {
-    /// Creates a new `DisconnectReason`.
-    pub fn new(class: DisconnectClass, reason: String) -> Self {
-        Self { class, reason, description: None }
-    }
-}
-
-/// The high-level category of a [`DisconnectReason`].
+/// The membership status of an [`RtcMember`].
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
 #[derive(Clone, StringEnum)]
 #[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
 #[ruma_enum(rename_all = "snake_case")]
-pub enum DisconnectClass {
-    /// The user deliberately ended their participation.
-    UserAction,
+pub enum RtcMembership {
+    /// The member intends to be joined to the slot.
+    Join,
 
-    /// An error occurred on the client.
-    ClientError,
+    /// The member intends to have left the slot.
+    Leave,
 
-    /// An error occurred on the server.
-    ServerError,
+    #[doc(hidden)]
+    _Custom(PrivOwnedStr),
+}
 
-    /// The member was redirected to another session.
-    Redirection,
+/// The reason why a member left a MatrixRTC slot.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+pub struct LeaveReason {
+    /// The identifier for the specific leave cause.
+    pub code: LeaveCode,
 
-    /// A failure occurred that cannot be recovered from.
-    PermanentFailure,
+    /// An optional human-readable explanation of the leave reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl LeaveReason {
+    /// Creates a new `LeaveReason` with the given code.
+    pub fn new(code: LeaveCode) -> Self {
+        Self { code, reason: None }
+    }
+}
+
+/// The code of a [`LeaveReason`].
+///
+/// Further values may be introduced by application and/or transport specifications.
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/doc/string_enum.md"))]
+#[derive(Clone, StringEnum)]
+#[cfg_attr(not(ruma_unstable_exhaustive_types), non_exhaustive)]
+#[ruma_enum(rename_all = "snake_case")]
+pub enum LeaveCode {
+    /// The member left intentionally, e.g. by hanging up a call.
+    Leave,
+
+    /// The member left through a scheduled delayed leave event.
+    DelayedLeave,
+
+    /// The member left because the slot was closed midway through the session.
+    SlotClosed,
 
     #[doc(hidden)]
     _Custom(PrivOwnedStr),
@@ -183,147 +179,167 @@ pub enum DisconnectClass {
 #[cfg(test)]
 mod tests {
     use assert_matches2::assert_matches;
-    use ruma_common::{owned_device_id, owned_user_id};
     use serde_json::{from_value as from_json_value, json, to_value as to_json_value};
 
-    use super::{DisconnectClass, DisconnectReason, RtcMember, RtcMemberEventContent};
+    use super::{LeaveCode, LeaveReason, RtcMemberEventContent, RtcMembership};
     use crate::{
         AnyMessageLikeEvent, MessageLikeEvent,
-        rtc::{application::CallApplication, transport::RtcTransport},
+        rtc::{
+            application::CallApplication,
+            transport::{RtcTransport, RtcTransports},
+        },
     };
 
     #[cfg(feature = "unstable-msc4195")]
     #[test]
-    fn connecting_member_event_serialization() {
-        let content = RtcMemberEventContent::new(
+    fn joining_member_event_serialization() {
+        let mut transports = RtcTransports::new();
+        transports.published =
+            vec![RtcTransport::livekit("https://livekit.example.com/jwt".to_owned())];
+        transports.can_subscribe = vec!["livekit".to_owned()];
+
+        let content = RtcMemberEventContent::join(
             "m.call#ROOM".to_owned(),
+            "xyzABCDEF0123".to_owned(),
             CallApplication::new("UUID".to_owned()).into(),
-            RtcMember::new(
-                "xyzABCDEF0123".to_owned(),
-                owned_device_id!("DEVICEID"),
-                owned_user_id!("@user:matrix.domain"),
-            ),
-            vec![RtcTransport::livekit("https://livekit.example.com/jwt".to_owned())],
-            vec!["v0".to_owned()],
+            transports,
         );
 
         assert_eq!(
             to_json_value(&content).unwrap(),
             json!({
                 "slot_id": "m.call#ROOM",
-                "sticky_key": "xyzABCDEF0123",
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "membership": "join",
+                },
                 "application": {
                     "type": "m.call",
                     "m.call.id": "UUID",
                 },
-                "member": {
-                    "id": "xyzABCDEF0123",
-                    "claimed_device_id": "DEVICEID",
-                    "claimed_user_id": "@user:matrix.domain",
+                "transports": {
+                    "published": [
+                        {
+                            "type": "livekit",
+                            "livekit_service_url": "https://livekit.example.com/jwt",
+                        }
+                    ],
+                    "can_subscribe": ["livekit"],
                 },
-                "rtc_transports": [
-                    {
-                        "type": "livekit",
-                        "livekit_service_url": "https://livekit.example.com/jwt",
-                    }
-                ],
-                "versions": ["v0"],
+                "sticky_key": "xyzABCDEF0123",
             })
         );
     }
 
     #[test]
-    fn connecting_member_event_custom_transport_serialization() {
+    fn joining_member_event_custom_transport_serialization() {
         let transport = RtcTransport::new(
             "org.example.transport",
             json!({ "url": "https://sfu.example.com" }).as_object().unwrap().clone(),
         )
         .unwrap();
-        let content = RtcMemberEventContent::new(
-            "m.call#ROOM".to_owned(),
-            CallApplication::new("UUID".to_owned()).into(),
-            RtcMember::new(
-                "xyzABCDEF0123".to_owned(),
-                owned_device_id!("DEVICEID"),
-                owned_user_id!("@user:matrix.domain"),
-            ),
-            vec![transport],
-            vec!["v0".to_owned()],
-        );
+        let mut transports = RtcTransports::new();
+        transports.published = vec![transport];
 
-        assert_eq!(
-            to_json_value(&content).unwrap(),
-            json!({
-                "slot_id": "m.call#ROOM",
-                "sticky_key": "xyzABCDEF0123",
-                "application": {
-                    "type": "m.call",
-                    "m.call.id": "UUID",
-                },
-                "member": {
-                    "id": "xyzABCDEF0123",
-                    "claimed_device_id": "DEVICEID",
-                    "claimed_user_id": "@user:matrix.domain",
-                },
-                "rtc_transports": [
-                    {
-                        "type": "org.example.transport",
-                        "url": "https://sfu.example.com",
-                    }
-                ],
-                "versions": ["v0"],
-            })
-        );
-    }
-
-    #[test]
-    fn disconnecting_member_event_serialization() {
-        let content = RtcMemberEventContent::disconnected(
+        let content = RtcMemberEventContent::join(
             "m.call#ROOM".to_owned(),
             "xyzABCDEF0123".to_owned(),
-            DisconnectReason {
-                class: DisconnectClass::ServerError,
-                reason: "ice_failed".to_owned(),
-                description: Some("Failed to establish peer-to-peer connection via ICE".to_owned()),
-            },
+            CallApplication::new("UUID".to_owned()).into(),
+            transports,
         );
 
         assert_eq!(
             to_json_value(&content).unwrap(),
             json!({
                 "slot_id": "m.call#ROOM",
-                "sticky_key": "xyzABCDEF0123",
-                "disconnect_reason": {
-                    "class": "server_error",
-                    "reason": "ice_failed",
-                    "description": "Failed to establish peer-to-peer connection via ICE",
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "membership": "join",
                 },
+                "application": {
+                    "type": "m.call",
+                    "m.call.id": "UUID",
+                },
+                "transports": {
+                    "published": [
+                        {
+                            "type": "org.example.transport",
+                            "url": "https://sfu.example.com",
+                        }
+                    ],
+                },
+                "sticky_key": "xyzABCDEF0123",
             })
         );
     }
 
     #[test]
-    fn connecting_member_event_deserialization() {
+    fn leaving_member_event_serialization() {
+        let mut content =
+            RtcMemberEventContent::leave("m.call#ROOM".to_owned(), "xyzABCDEF0123".to_owned());
+        content.leave_reason = Some(LeaveReason {
+            code: LeaveCode::DelayedLeave,
+            reason: Some("Client lost connectivity".to_owned()),
+        });
+
+        assert_eq!(
+            to_json_value(&content).unwrap(),
+            json!({
+                "slot_id": "m.call#ROOM",
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "membership": "leave",
+                },
+                "leave_reason": {
+                    "code": "delayed_leave",
+                    "reason": "Client lost connectivity",
+                },
+                "sticky_key": "xyzABCDEF0123",
+            })
+        );
+    }
+
+    #[test]
+    fn leaving_member_event_without_reason_serialization() {
+        let content =
+            RtcMemberEventContent::leave("m.call#ROOM".to_owned(), "xyzABCDEF0123".to_owned());
+
+        assert_eq!(
+            to_json_value(&content).unwrap(),
+            json!({
+                "slot_id": "m.call#ROOM",
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "membership": "leave",
+                },
+                "sticky_key": "xyzABCDEF0123",
+            })
+        );
+    }
+
+    #[test]
+    fn joining_member_event_deserialization() {
         let json_data = json!({
             "content": {
                 "slot_id": "m.call#ROOM",
-                "sticky_key": "xyzABCDEF0123",
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "membership": "join",
+                },
                 "application": {
                     "type": "m.call",
                     "m.call.id": "UUID",
                 },
-                "member": {
-                    "id": "xyzABCDEF0123",
-                    "claimed_device_id": "DEVICEID",
-                    "claimed_user_id": "@user:matrix.domain",
+                "transports": {
+                    "published": [
+                        {
+                            "type": "livekit",
+                            "livekit_service_url": "https://livekit.example.com/jwt",
+                        }
+                    ],
+                    "can_subscribe": ["livekit"],
                 },
-                "rtc_transports": [
-                    {
-                        "type": "livekit",
-                        "livekit_service_url": "https://livekit.example.com/jwt",
-                    }
-                ],
-                "versions": ["v0"],
+                "sticky_key": "xyzABCDEF0123",
             },
             "event_id": "$event:notareal.hs",
             "origin_server_ts": 134_829_848,
@@ -337,23 +353,30 @@ mod tests {
             event,
             AnyMessageLikeEvent::RtcMember(MessageLikeEvent::Original(member_event))
         );
-        assert_eq!(member_event.content.slot_id, "m.call#ROOM");
-        assert_eq!(member_event.content.sticky_key, "xyzABCDEF0123");
-        assert_eq!(member_event.content.rtc_transports.len(), 1);
-        assert_matches!(member_event.content.member, Some(member));
-        assert_eq!(member.id, "xyzABCDEF0123");
+        let content = member_event.content;
+        assert_eq!(content.slot_id, "m.call#ROOM");
+        assert_eq!(content.sticky_key, "xyzABCDEF0123");
+        assert_eq!(content.member.id, "xyzABCDEF0123");
+        assert_eq!(content.member.membership, RtcMembership::Join);
+        assert!(content.application.is_some());
+        assert_eq!(content.transports.published.len(), 1);
+        assert_eq!(content.transports.can_subscribe, ["livekit"]);
+        assert_matches!(content.leave_reason, None);
     }
 
     #[test]
-    fn disconnecting_member_event_deserialization() {
+    fn leaving_member_event_deserialization() {
         let json_data = json!({
             "content": {
                 "slot_id": "m.call#ROOM",
-                "sticky_key": "xyzABCDEF0123",
-                "disconnect_reason": {
-                    "class": "user_action",
-                    "reason": "hangup",
+                "member": {
+                    "id": "xyzABCDEF0123",
+                    "membership": "leave",
                 },
+                "leave_reason": {
+                    "code": "slot_closed",
+                },
+                "sticky_key": "xyzABCDEF0123",
             },
             "event_id": "$event:notareal.hs",
             "origin_server_ts": 134_829_848,
@@ -367,9 +390,12 @@ mod tests {
             event,
             AnyMessageLikeEvent::RtcMember(MessageLikeEvent::Original(member_event))
         );
-        assert_matches!(member_event.content.member, None);
-        assert_matches!(member_event.content.disconnect_reason, Some(reason));
-        assert_eq!(reason.class, DisconnectClass::UserAction);
-        assert_eq!(reason.reason, "hangup");
+        let content = member_event.content;
+        assert_eq!(content.member.membership, RtcMembership::Leave);
+        assert_eq!(content.application, None);
+        assert!(content.transports.is_empty());
+        assert_matches!(content.leave_reason, Some(leave_reason));
+        assert_eq!(leave_reason.code, LeaveCode::SlotClosed);
+        assert_eq!(leave_reason.reason, None);
     }
 }

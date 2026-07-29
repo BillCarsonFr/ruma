@@ -11,7 +11,8 @@ Improvements:
     `ruma_events::rtc::member`.
   - `ToDeviceRtcEncryptionKeyEventContent` (`m.rtc.encryption_key`, to-device event) in
     `ruma_events::rtc::encryption_key`.
-  - The supporting `RtcApplication` and `RtcTransport` types in `ruma_events::rtc::application` and
+  - The supporting `RtcApplication`, `RtcEncryption` and `RtcTransport` / `RtcTransports` types in
+    `ruma_events::rtc::application`, `ruma_events::rtc::encryption` and
     `ruma_events::rtc::transport`.
 - Add `replaces_state` field to `StateUnsigned`, due to a clarification in the Matrix spec.
 - Stabilize image packs:
