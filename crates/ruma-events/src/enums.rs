@@ -206,6 +206,9 @@ event_enum! {
         "m.room.pinned_events" => super::room::pinned_events,
         "m.room.policy" => super::room::policy,
         "m.room.power_levels" => super::room::power_levels,
+        #[cfg(feature = "unstable-msc1763")]
+        #[ruma_enum(alias = "m.room.retention")]
+        "org.matrix.msc1763.retention" => super::room::retention,
         "m.room.server_acl" => super::room::server_acl,
         "m.room.third_party_invite" => super::room::third_party_invite,
         "m.room.tombstone" => super::room::tombstone,
@@ -233,9 +236,7 @@ event_enum! {
     enum ToDevice {
         "m.dummy" => super::dummy,
         "m.room_key" => super::room_key,
-        #[cfg(feature = "unstable-msc4268")]
-        #[ruma_enum(alias = "m.room_key_bundle")]
-        "io.element.msc4268.room_key_bundle" => super::room_key_bundle,
+        "m.room_key_bundle" => super::room_key_bundle,
         "m.room_key_request" => super::room_key_request,
         "m.room_key.withheld" => super::room_key::withheld,
         "m.forwarded_room_key" => super::forwarded_room_key,

@@ -835,13 +835,13 @@ mod client_tests {
     use ruma_common::{
         RoomVersionId,
         api::{
-            IncomingResponse as _, MatrixVersion, OutgoingRequestExt as _, SupportedVersions,
+            IncomingResponseExt as _, MatrixVersion, OutgoingRequestExt as _, SupportedVersions,
             auth_scheme::SendAccessToken,
         },
         event_id, room_id, user_id,
     };
     use ruma_events::AnyStrippedStateEvent;
-    use serde_json::{Value as JsonValue, json, to_vec as to_json_vec};
+    use serde_json::{Value as JsonValue, json};
 
     use super::{Filter, PresenceState, Request, Response, State};
 
@@ -934,8 +934,9 @@ mod client_tests {
                     },
                 },
             },
-        });
-        let http_response = http::Response::new(to_json_vec(&body).unwrap());
+        })
+        .to_string();
+        let http_response = http::Response::new(body.as_bytes());
 
         let response = Response::try_from_http_response(http_response).unwrap();
         assert_eq!(response.next_batch, "a00");
@@ -975,9 +976,10 @@ mod client_tests {
                     },
                 },
             },
-        });
+        })
+        .to_string();
 
-        let http_response = http::Response::new(to_json_vec(&body).unwrap());
+        let http_response = http::Response::new(body.as_bytes());
 
         let response = Response::try_from_http_response(http_response).unwrap();
         assert_eq!(response.next_batch, "aaa");
@@ -1019,9 +1021,10 @@ mod client_tests {
                     },
                 },
             },
-        });
+        })
+        .to_string();
 
-        let http_response = http::Response::new(to_json_vec(&body).unwrap());
+        let http_response = http::Response::new(body.as_bytes());
 
         let response = Response::try_from_http_response(http_response).unwrap();
         assert_eq!(response.next_batch, "aaa");
@@ -1056,9 +1059,10 @@ mod client_tests {
                     },
                 },
             },
-        });
+        })
+        .to_string();
 
-        let http_response = http::Response::new(to_json_vec(&body).unwrap());
+        let http_response = http::Response::new(body.as_bytes());
 
         let response = Response::try_from_http_response(http_response).unwrap();
         assert_eq!(response.next_batch, "aaa");
@@ -1102,9 +1106,10 @@ mod client_tests {
                     },
                 },
             },
-        });
+        })
+        .to_string();
 
-        let http_response = http::Response::new(to_json_vec(&body).unwrap());
+        let http_response = http::Response::new(body.as_bytes());
 
         let response = Response::try_from_http_response(http_response).unwrap();
         assert_eq!(response.next_batch, "aaa");
@@ -1127,7 +1132,7 @@ mod server_tests {
 
     use assert_matches2::assert_matches;
     use ruma_common::{
-        api::{IncomingRequest as _, OutgoingResponse as _},
+        api::{IncomingRequestExt as _, OutgoingResponseExt as _},
         owned_room_id,
         presence::PresenceState,
         serde::Raw,
@@ -1176,7 +1181,7 @@ mod server_tests {
 
         let req = Request::try_from_http_request(
             http::Request::builder().uri(uri).body(&[] as &[u8]).unwrap(),
-            &[] as &[String],
+            &[],
         )
         .unwrap();
 
@@ -1199,7 +1204,7 @@ mod server_tests {
 
         let req = Request::try_from_http_request(
             http::Request::builder().uri(uri).body(&[] as &[u8]).unwrap(),
-            &[] as &[String],
+            &[],
         )
         .unwrap();
 
@@ -1225,7 +1230,7 @@ mod server_tests {
 
         let req = Request::try_from_http_request(
             http::Request::builder().uri(uri).body(&[] as &[u8]).unwrap(),
-            &[] as &[String],
+            &[],
         )
         .unwrap();
 

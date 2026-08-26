@@ -14,6 +14,8 @@ Bug fixes:
   field was non-empty.
 - In the `room::create_room::v3` module, fix the serialization of `CreationContent` when only
   the `additional_creators` field was non-empty.
+- In the `threads::get_threads::v1` module, fix the deserialization of `Request`
+  when `include` parameter is omitted
 
 Improvements:
 
@@ -44,6 +46,9 @@ Improvements:
   being decoded directly. The profile updates now use a `UserProfileUpdate` enum to signal if the
   profile changed or should be dropped.
 - Stabilize support for [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) (Get rooms in common with another user).
+- Add support for [MSC1763] (Configurable per-room message retention periods).
+
+[MSC1763]: https://github.com/matrix-org/matrix-spec-proposals/pull/1763
 
 ## 0.24.0
 

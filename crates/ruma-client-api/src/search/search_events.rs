@@ -605,8 +605,8 @@ mod tests {
     use js_int::uint;
     use ruma_common::{
         api::{
-            IncomingRequest, IncomingResponse, OutgoingRequestExt as _, OutgoingResponse,
-            SupportedVersions, auth_scheme::SendAccessToken,
+            IncomingRequestExt as _, IncomingResponseExt as _, OutgoingRequestExt as _,
+            OutgoingResponseExt as _, SupportedVersions, auth_scheme::SendAccessToken,
         },
         event_id, room_id,
     };
@@ -633,10 +633,13 @@ mod tests {
             }
         });
 
-        let http_request = http::Request::post("http://localhost/_matrix/client/v3/search")
-            .body(to_json_vec(&body).unwrap())
-            .unwrap();
-        let request = Request::try_from_http_request(http_request, &[] as &[&str]).unwrap();
+        let request = Request::try_from_http_request(
+            http::Request::post("http://localhost/_matrix/client/v3/search")
+                .body(to_json_vec(&body).unwrap().as_slice())
+                .unwrap(),
+            &[],
+        )
+        .unwrap();
 
         let criteria = request.search_categories.room_events.as_ref().unwrap();
         assert_eq!(criteria.groupings.group_by.len(), 1);
@@ -704,7 +707,8 @@ mod tests {
         });
         let result_event_id = event_id!("$144429830826TWwbB:localhost");
 
-        let http_request = http::Response::new(to_json_vec(&body).unwrap());
+        let body_bytes = body.to_string().into_bytes();
+        let http_request = http::Response::new(body_bytes.as_slice());
         let response = Response::try_from_http_response(http_request).unwrap();
 
         let results = &response.search_categories.room_events;

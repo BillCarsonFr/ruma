@@ -8,6 +8,18 @@ Breaking changes:
   that is automatically implemented for any `T: OutgoingRequest`
   - Implementors of `OutgoingRequest` now instead have to provide the new `type Body`
     and `fn try_into_http_request_inner`
+- `OutgoingResponse::try_into_http_response` has been moved to a new `OutgoingResponseExt` trait
+  that is automatically implemented for any `T: OutgoingResponse`
+  - Implementors of `OutgoingResponse` now instead have to provide the new `type Body`
+    and `fn try_into_http_response_inner`
+- `IncomingRequest::try_from_http_request` has been moved to a new `IncomingRequestExt` trait
+  that is automatically implemented for any `T: IncomingRequest`
+  - Implementors of `IncomingRequest` now instead have to provide the
+    `fn try_from_http_request_inner`
+  - The generics were removed from `try_from_http_request`, the body of the request is a `&[u8]` and
+    the path args is a `&[&str]`.
+  - `IncomingRequest::check_request_method` was removed, this check is part of
+    `IncomingRequestExt::try_from_http_request`.
 
 Bug fixes:
 
@@ -28,9 +40,11 @@ Improvements:
   dropped.
 - `UserProfile::merge` has been renamed to `UserProfile::apply`.
 - Add experimental support for [MSC4495] (Selective Presence).
+- Add experimental support for [MSC4494] (Membership-based invite blocking).
 
 [MSC4438]: https://github.com/matrix-org/matrix-spec-proposals/pull/4438
 [MSC4495]: https://github.com/matrix-org/matrix-spec-proposals/pull/4495
+[MSC4494]: https://github.com/matrix-org/matrix-spec-proposals/pull/4494
 
 ## 0.19.0
 
